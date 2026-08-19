@@ -1,0 +1,259 @@
+{
+  "Cartridge GPL header": {
+    "prefix": "cartheader",
+    "description": "Standard cartridge header at >6000 with one menu entry. xas99 -c will skip adding its own header when it finds this.",
+    "body": [
+      "       DEF  STDHDR",
+      "",
+      "* Cartridge ROM is mapped at >6000->7FFF",
+      "       AORG >6000",
+      "",
+      "STDHDR BYTE >AA                  * Standard header marker",
+      "       BYTE >01                  * Version",
+      "       BYTE >01                  * Number of programs",
+      "       BYTE >00                  * Reserved",
+      "       DATA >0000                * Power-up list (unusable from ROM)",
+      "       DATA PROG                 * Program list",
+      "       DATA >0000                * DSR list",
+      "       DATA >0000                * Subprogram list",
+      "       DATA >0000                * ISR list",
+      "",
+      "PROG   DATA >0000                * No next menu item",
+      "       DATA ${1:MAIN}                  * Entry point",
+      "       BYTE ${2:8}                     * Length of the menu text",
+      "       TEXT '${3:MY GAME}'",
+      "       EVEN",
+      "$0"
+    ]
+  },
+
+  "Workspace setup": {
+    "prefix": "workspace",
+    "description": "Point the workspace at scratchpad RAM. >8300 is not multiplexed, so register access avoids the 4-cycle wait state.",
+    "body": [
+      "WRKSP  EQU  >${1:8300}              * Workspace in scratchpad RAM",
+      "",
+      "${2:MAIN}   LIMI 0                    * Interrupts off while we set up",
+      "       LWPI WRKSP                * Our own workspace",
+      "$0"
+    ]
+  },
+
+  "VDP register write": {
+    "prefix": "vdpreg",
+    "description": "Write one VDP register directly through the ports, no E/A utilities needed.",
+    "body": [
+      "VDPWA  EQU  >8C02                * VDP address port",
+      "",
+      "       LI   R0,>${1:80}${2:00}              * Register ${1} in the high byte, value in the low",
+      "       ORI  R0,>8000             * Set the register-write bits",
+      "       SWPB R0",
+      "       MOVB R0,@VDPWA            * Value first",
+      "       SWPB R0",
+      "       MOVB R0,@VDPWA            * Then register number",
+      "$0"
+    ]
+  },
+
+  "VDP register table load": {
+    "prefix": "vdpregtable",
+    "description": "Load all eight VDP registers from a byte table. This is the loop used in most cartridge start-up code.",
+    "body": [
+      "REGLD  BYTE >${1:00},>E0,>00,>0E,>01,>06,>00,>07  * VDP register values",
+      "       EVEN",
+      "",
+      "       LI   R1,REGLD             * Point at the value table",
+      "       LI   R2,>8000             * Register 0, write bit set",
+      "VDPRLP MOVB *R1+,R3              * Fetch the value",
+      "       MOVB R3,@>8C02            * Write value",
+      "       MOVB R2,@>8C02            * Write register number",
+      "       AI   R2,>0100             * Next register",
+      "       CI   R2,>8800             * Past register 7?",
+      "       JL   VDPRLP",
+      "$0"
+    ]
+  },
+
+  "VDP write address": {
+    "prefix": "vdpaddr",
+    "description": "Set the VDP address counter for a write. Low byte first, then the high byte with bit 6 set.",
+    "body": [
+      "       LI   R0,${1:>0000}              * VDP address",
+      "       ORI  R0,>4000             * Bit 14 marks a write",
+      "       SWPB R0",
+      "       MOVB R0,@>8C02",
+      "       SWPB R0",
+      "       MOVB R0,@>8C02",
+      "$0"
+    ]
+  },
+
+  "VSBW single byte write": {
+    "prefix": "vsbw",
+    "description": "Editor/Assembler single byte VDP write. Requires REF VSBW.",
+    "body": [
+      "       LI   R0,${1:>0000}              * VDP address",
+      "       LI   R1,${2:>2000}              * Character in the high byte",
+      "       BLWP @VSBW",
+      "$0"
+    ]
+  },
+
+  "VMBW multiple byte write": {
+    "prefix": "vmbw",
+    "description": "Editor/Assembler multiple byte VDP write. Requires REF VMBW.",
+    "body": [
+      "       LI   R0,${1:>0000}              * VDP destination",
+      "       LI   R1,${2:MSG}                * CPU source",
+      "       LI   R2,${3:MSGLEN}             * Byte count",
+      "       BLWP @VMBW",
+      "$0"
+    ]
+  },
+
+  "Clear the screen": {
+    "prefix": "clearscreen",
+    "description": "Fill the 24x32 screen image table with a single character.",
+    "body": [
+      "       LI   R0,>4000             * VDP >0000, write",
+      "       SWPB R0",
+      "       MOVB R0,@>8C02",
+      "       SWPB R0",
+      "       MOVB R0,@>8C02",
+      "       LI   R1,${1:>2000}              * Space character in the high byte",
+      "       LI   R2,24*32             * 768 screen positions",
+      "CLRLP  MOVB R1,@>8C00            * Write to VDP data port",
+      "       DEC  R2",
+      "       JNE  CLRLP",
+      "$0"
+    ]
+  },
+
+  "Keyboard scan": {
+    "prefix": "kscan",
+    "description": "Scan the keyboard through the E/A utility. Requires REF KSCAN.",
+    "body": [
+      "       CLR  R0",
+      "       MOVB R0,@>8374            * Unit 0: scan the whole keyboard",
+      "       BLWP @KSCAN",
+      "       MOVB @>837C,R0            * GPL status",
+      "       COC  @KEYMSK,R0           * Was a key pressed?",
+      "       JNE  ${1:NOKEY}",
+      "       MOVB @>8375,R1            * Key code in the high byte",
+      "       SRL  R1,8",
+      "$0",
+      "KEYMSK DATA >2000"
+    ]
+  },
+
+  "Subroutine with BL": {
+    "prefix": "sub",
+    "description": "BL subroutine. R11 holds the return address, so nested calls must save it.",
+    "body": [
+      "*----------------------------------------------------------",
+      "* ${1:NAME} -- ${2:what it does}",
+      "*   Entry: ${3:R0 = ...}",
+      "*   Exit:  ${4:R0 = ...}",
+      "*   Uses:  ${5:R0, R1}",
+      "*----------------------------------------------------------",
+      "${1:NAME}   MOV  R11,@${1:NAME}RT           * Save the return address",
+      "$0",
+      "       MOV  @${1:NAME}RT,R11",
+      "       RT",
+      "${1:NAME}RT DATA 0"
+    ]
+  },
+
+  "Delay loop": {
+    "prefix": "delay",
+    "description": "Busy-wait delay. Roughly 14 cycles per inner iteration at 3 MHz.",
+    "body": [
+      "       LI   R${1:1},${2:1000}",
+      "DLYLP${3:1} DEC  R${1:1}",
+      "       JNE  DLYLP${3:1}",
+      "$0"
+    ]
+  },
+
+  "Sprite attribute entry": {
+    "prefix": "sprite",
+    "description": "One entry in the sprite attribute list: Y, X, pattern, colour. Y=>D0 terminates the list.",
+    "body": [
+      "${1:SPR0}   BYTE ${2:>60}                    * Y position (screen row * 8 - 1)",
+      "       BYTE ${3:>80}                    * X position",
+      "       BYTE ${4:>00}                    * Pattern number",
+      "       BYTE ${5:>0F}                    * Early clock and colour",
+      "$0"
+    ]
+  },
+
+  "Module with DEF and REF": {
+    "prefix": "module",
+    "description": "Separately assembled module exporting one entry point.",
+    "body": [
+      "       IDT  '${1:MODULE}'",
+      "       DEF  ${2:ENTRY}",
+      "       REF  ${3:VSBW,VMBW}",
+      "",
+      "${2:ENTRY}  MOV  R11,@RETADR",
+      "$0",
+      "       MOV  @RETADR,R11",
+      "       RT",
+      "",
+      "RETADR DATA 0",
+      "       END"
+    ]
+  },
+
+  "E/A option 5 program": {
+    "prefix": "ea5",
+    "description": "Editor/Assembler option 5 image. SFIRST and SLAST bound the saved memory range.",
+    "body": [
+      "       AORG >A000",
+      "",
+      "SFIRST EQU  $                    * First byte saved",
+      "",
+      "${1:START}  LIMI 0",
+      "       LWPI >8300",
+      "$0",
+      "       LIMI 2",
+      "       B    @>0070               * Return to the E/A menu",
+      "",
+      "SLAST  EQU  $                    * Last byte saved",
+      "SLOAD  EQU  SFIRST",
+      "       END  ${1:START}"
+    ]
+  },
+
+  "Data table": {
+    "prefix": "table",
+    "description": "Word table with a computed length constant.",
+    "body": [
+      "${1:TABLE}  DATA ${2:>0000,>0000,>0000,>0000}",
+      "${1:TABLE}E EQU  $",
+      "${1:TABLE}N EQU  (${1:TABLE}E-${1:TABLE})/2      * Number of entries",
+      "$0"
+    ]
+  },
+
+  "Text with length prefix": {
+    "prefix": "textmsg",
+    "description": "Text constant with a length symbol, ready for VMBW.",
+    "body": [
+      "${1:MSG}    TEXT '${2:HELLO WORLD}'",
+      "${1:MSG}L   EQU  $-${1:MSG}               * Length in bytes",
+      "       EVEN",
+      "$0"
+    ]
+  },
+
+  "Region fold marker": {
+    "prefix": "region",
+    "description": "Foldable region marker.",
+    "body": [
+      "* region ${1:name}",
+      "$0",
+      "* endregion"
+    ]
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "TMS9900 Assembly",
+  "scopeName": "source.tms9900",
+  "patterns": [
+    { "include": "#full-line-comment" },
+    { "include": "#label" },
+    { "include": "#text-literal" },
+    { "include": "#filename-literal" },
+    { "include": "#trailing-comment" },
+    { "include": "#preprocessor" },
+    { "include": "#directive" },
+    { "include": "#instruction-9900" },
+    { "include": "#instruction-ext" },
+    { "include": "#register" },
+    { "include": "#number" },
+    { "include": "#addressing" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "full-line-comment": {
+      "comment": "An asterisk or semicolon in column 1 comments the whole line.",
+      "match": "^[*;].*$",
+      "name": "comment.line.tms9900"
+    },
+    "trailing-comment": {
+      "comment": "xas99 default syntax: two spaces or a tab end the operand field.",
+      "patterns": [
+        { "match": "(?:[ ]{2,}|\\t)\\*.*$", "name": "comment.line.field.tms9900" },
+        { "match": ";.*$", "name": "comment.line.semicolon.tms9900" }
+      ]
+    },
+    "label": {
+      "comment": "A label must begin in column 1.",
+      "match": "^([A-Za-z_!][^\\s:]*)(:)?",
+      "captures": {
+        "1": { "name": "entity.name.function.label.tms9900" },
+        "2": { "name": "punctuation.separator.label.tms9900" }
+      }
+    },
+    "text-literal": {
+      "begin": "'",
+      "end": "'(?!')",
+      "name": "string.quoted.single.tms9900",
+      "patterns": [{ "match": "''", "name": "constant.character.escape.tms9900" }]
+    },
+    "filename-literal": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.filename.tms9900"
+    },
+    "preprocessor": {
+      "match": "(?i)(?<=^|\\s)\\.(DEFM|ENDM|IFDEF|IFNDEF|IFEQ|IFNE|IFGT|IFGE|IFLT|IFLE|ELSE|ENDIF|REPT|ENDR|PRINT|ERROR)\\b",
+      "name": "keyword.control.preprocessor.tms9900"
+    },
+    "directive": {
+      "patterns": [
+        {
+          "comment": "Directives understood by the TI Editor/Assembler loader.",
+          "match": "(?i)(?<=\\s)(AORG|RORG|DORG|DEF|REF|EQU|DATA|BYTE|TEXT|BSS|BES|EVEN|COPY|END|IDT|DXOP)(?=\\s|$)",
+          "name": "keyword.control.directive.ea.tms9900"
+        },
+        {
+          "comment": "xdt99 extensions -- flagged separately so they can be themed or linted.",
+          "match": "(?i)(?<=\\s)(WEQU|REQU|XORG|BANK|SAVE|STRI|BCOPY|FLOA|TITL|PAGE|LIST|UNL|PSEG|PEND|CSEG|CEND|DSEG|DEND|LOAD|SREF)(?=\\s|$)",
+          "name": "keyword.control.directive.xdt99.tms9900"
+        }
+      ]
+    },
+    "instruction-9900": {
+      "patterns": [
+        {
+          "comment": "Format I/III/IV/V/IX -- dual operand",
+          "match": "(?i)(?<=\\s)(MOVB|MOV|SOCB|SOC|SZCB|SZC|AB|A|CB|C|SB|S|COC|CZC|XOR|LDCR|STCR|SLA|SRA|SRC|SRL|MPY|DIV|XOP)(?=\\s|$)",
+          "name": "keyword.operator.instruction.tms9900"
+        },
+        {
+          "comment": "Format II -- jumps and CRU bit ops",
+          "match": "(?i)(?<=\\s)(JEQ|JGT|JHE|JH|JLE|JLT|JL|JMP|JNC|JNE|JNO|JOC|JOP|SBO|SBZ|TB)(?=\\s|$)",
+          "name": "keyword.control.branch.tms9900"
+        },
+        {
+          "comment": "Format VI -- single operand",
+          "match": "(?i)(?<=\\s)(ABS|BLWP|BL|B|CLR|DECT|DEC|INCT|INC|INV|NEG|SETO|SWPB|X)(?=\\s|$)",
+          "name": "keyword.operator.instruction.tms9900"
+        },
+        {
+          "comment": "Format VII/VIII -- immediate and control",
+          "match": "(?i)(?<=\\s)(AI|ANDI|ORI|CI|LI|LIMI|LWPI|STST|STWP|RTWP|CKON|CKOF|IDLE|LREX|RSET|NOP|RT)(?=\\s|$)",
+          "name": "keyword.operator.instruction.tms9900"
+        }
+      ]
+    },
+    "instruction-ext": {
+      "comment": "TMS9995 / TMS99000 / F18A -- require -5, -105 or -18",
+      "match": "(?i)(?<=\\s)(MPYS|DIVS|LST|LWP|BIND|BLSK|AM|SM|TMB|TCMB|TSMB|SLAM|SRAM|SLC|PIX|CALL|PUSH|POP|RET)(?=\\s|$)",
+      "name": "keyword.operator.instruction.extended.tms9900"
+    },
+    "register": {
+      "match": "(?i)\\bR(1[0-5]|[0-9])\\b",
+      "name": "variable.language.register.tms9900"
+    },
+    "number": {
+      "patterns": [
+        { "match": ">[0-9A-Fa-f]+", "name": "constant.numeric.hex.tms9900" },
+        { "match": ":[01]+", "name": "constant.numeric.binary.tms9900" },
+        { "match": "\\b[0-9]+\\b", "name": "constant.numeric.decimal.tms9900" }
+      ]
+    },
+    "addressing": {
+      "patterns": [
+        { "match": "@", "name": "keyword.operator.addressing.symbolic.tms9900" },
+        { "match": "(?<=[ ,(])\\*", "name": "keyword.operator.addressing.indirect.tms9900" },
+        { "match": "(?<=R[0-9]|R1[0-5])\\+", "name": "keyword.operator.addressing.autoinc.tms9900" }
+      ]
+    },
+    "operator": {
+      "match": "[+\\-/%&|^~]|\\*\\*|<<|>>|//|%%",
+      "name": "keyword.operator.arithmetic.tms9900"
+    }
+  }
+}

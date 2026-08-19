@@ -1,0 +1,491 @@
+{
+  "name": "ti99-dev-suite",
+  "displayName": "TI-99/4A Development Suite",
+  "description": "TMS9900 assembly language support, build, packaging and emulator launch for the TI-99/4A.",
+  "version": "0.1.2",
+  "publisher": "your-publisher-id",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "ti99",
+    "ti-99/4a",
+    "tms9900",
+    "assembly",
+    "retro",
+    "xdt99",
+    "xas99"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Highlighting, formatting and static analysis work without trust. Building and launching an emulator execute local programs and require trust."
+    }
+  },
+  "activationEvents": [
+    "onLanguage:tms9900",
+    "workspaceContains:**/ti99.json",
+    "workspaceContains:**/*.a99"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "tms9900",
+        "aliases": [
+          "TMS9900 Assembly",
+          "TI-99 Assembly"
+        ],
+        "extensions": [
+          ".a99",
+          ".asm",
+          ".s",
+          ".inc",
+          ".equ"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tms9900",
+        "scopeName": "source.tms9900",
+        "path": "./syntaxes/tms9900.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "tms9900",
+        "path": "./snippets/tms9900.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ti99.build",
+        "title": "Build",
+        "category": "TI-99",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "ti99.rebuild",
+        "title": "Rebuild",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.clean",
+        "title": "Clean",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.run",
+        "title": "Run in Emulator",
+        "category": "TI-99",
+        "icon": "$(play)"
+      },
+      {
+        "command": "ti99.buildAndRun",
+        "title": "Build and Run",
+        "category": "TI-99",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "ti99.newProject",
+        "title": "Create New Project",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.importProject",
+        "title": "Import Existing Source",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.toolchainStatus",
+        "title": "Show Toolchain Status",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.configureToolchain",
+        "title": "Configure Toolchain",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.convertSyntax",
+        "title": "Convert Source to xas99 Syntax",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.detectDialect",
+        "title": "Detect Source Dialect",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.checkHazards",
+        "title": "Check for Dialect Hazards",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.showListing",
+        "title": "Open Build Listing",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.showMemoryMap",
+        "title": "Show Memory Map",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.showDiskCatalog",
+        "title": "Show Disk Catalog",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.exportToHardware",
+        "title": "Export to Real Hardware",
+        "category": "TI-99"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "ti99.buildAndRun",
+          "when": "resourceLangId == tms9900",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "ti99.convertSyntax",
+          "when": "resourceLangId == tms9900",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "ti99.build",
+        "key": "ctrl+shift+b",
+        "when": "resourceLangId == tms9900"
+      },
+      {
+        "command": "ti99.buildAndRun",
+        "key": "f5",
+        "when": "resourceLangId == tms9900"
+      }
+    ],
+    "configuration": [
+      {
+        "title": "TI-99: Language",
+        "properties": {
+          "ti99.syntaxDialect": {
+            "type": "string",
+            "enum": [
+              "ea",
+              "xdt99",
+              "relaxed"
+            ],
+            "enumDescriptions": [
+              "TI Editor/Assembler compatible. A single blank ends the operand field. Required for most legacy sources, including Asm994a code. Assembles with -s.",
+              "xas99 default. Two blanks or a tab end the operand field. Enables local labels, macros, BANK, SAVE and extended expressions.",
+              "xas99 relaxed. Whitespace unrestricted; comments need a leading semicolon. Assembles with -r."
+            ],
+            "default": "xdt99",
+            "markdownDescription": "Syntax dialect for this workspace. This one setting drives tokenizing, formatting and the assembler flag, so keep it accurate. Run **TI-99: Detect Source Dialect** if unsure."
+          },
+          "ti99.processor": {
+            "type": "string",
+            "enum": [
+              "9900",
+              "9995",
+              "99000",
+              "f18a"
+            ],
+            "default": "9900",
+            "description": "Target processor. Anything other than 9900 enables extra instructions and passes the matching flag to the assembler."
+          }
+        }
+      },
+      {
+        "title": "TI-99: Formatting",
+        "properties": {
+          "ti99.format.labelColumn": {
+            "type": "number",
+            "default": 1,
+            "description": "Column for the label field."
+          },
+          "ti99.format.opcodeColumn": {
+            "type": "number",
+            "default": 8,
+            "description": "Column for the instruction or directive field."
+          },
+          "ti99.format.operandColumn": {
+            "type": "number",
+            "default": 13,
+            "description": "Column for the operand field."
+          },
+          "ti99.format.commentColumn": {
+            "type": "number",
+            "default": 31,
+            "description": "Column for trailing comments."
+          },
+          "ti99.format.alignComments": {
+            "type": "boolean",
+            "default": true,
+            "description": "Align trailing comments to the comment column."
+          },
+          "ti99.format.uppercaseMnemonics": {
+            "type": "boolean",
+            "default": true,
+            "description": "Uppercase instruction and directive mnemonics."
+          },
+          "ti99.format.uppercaseRegisters": {
+            "type": "boolean",
+            "default": true,
+            "description": "Uppercase register names outside string literals."
+          },
+          "ti99.format.minCommentGap": {
+            "type": "number",
+            "default": 2,
+            "minimum": 2,
+            "markdownDescription": "Minimum blanks between operand and trailing comment. **Cannot be lowered below 2**: a single blank turns a `*` comment into a multiplication operator under xas99 default syntax and silently changes the program."
+          }
+        }
+      },
+      {
+        "title": "TI-99: Toolchain",
+        "properties": {
+          "ti99.toolchain.profile": {
+            "type": "string",
+            "default": "xdt99",
+            "description": "Which registered tool profile builds this project."
+          },
+          "ti99.toolchain.pythonPath": {
+            "type": "string",
+            "default": "",
+            "description": "Python 3.8+ interpreter. Empty to auto-detect."
+          },
+          "ti99.toolchain.xdt99Path": {
+            "type": "string",
+            "default": "",
+            "description": "Directory containing xas99.py and xdm99.py. Empty to auto-detect."
+          },
+          "ti99.toolchain.customPath": {
+            "type": "string",
+            "default": "",
+            "description": "Executable for a custom assembler profile."
+          },
+          "ti99.toolchain.profiles": {
+            "type": "array",
+            "default": [],
+            "description": "Additional tool profiles declaring capabilities, detection rules and argument templates.",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      {
+        "title": "TI-99: Emulators",
+        "properties": {
+          "ti99.emulator.profile": {
+            "type": "string",
+            "default": "",
+            "description": "Emulator profile used by Run and Build and Run."
+          },
+          "ti99.emulator.classic99Path": {
+            "type": "string",
+            "default": "",
+            "description": "Path to Classic99.exe. Launched as: classic99.exe -rom <file>"
+          },
+          "ti99.emulator.classic99Dsk1": {
+            "type": "string",
+            "default": "",
+            "description": "Classic99 DSK1 folder. Disk builds drop TIFILES output here, since Classic99 cannot write to .dsk images."
+          },
+          "ti99.emulator.mamePath": {
+            "type": "string",
+            "default": "",
+            "description": "Path to the MAME executable."
+          },
+          "ti99.emulator.mameSystem": {
+            "type": "string",
+            "default": "ti99_4a",
+            "enum": [
+              "ti99_4",
+              "ti99_4a",
+              "ti99_4ae",
+              "ti99_8"
+            ],
+            "description": "MAME system driver. ti99_4ae is the PAL 4A."
+          },
+          "ti99.emulator.eaCartridgePath": {
+            "type": "string",
+            "default": "",
+            "description": "Your own Editor/Assembler cartridge image for disk projects under MAME. Never downloaded for you."
+          },
+          "ti99.emulator.win994aPath": {
+            "type": "string",
+            "default": "",
+            "description": "Path to Win994a.exe. Launch only; no documented command line for loading a program."
+          },
+          "ti99.emulator.customPath": {
+            "type": "string",
+            "default": "",
+            "description": "Executable for a custom emulator profile."
+          },
+          "ti99.emulator.customArgs": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "description": "Arguments for a custom emulator. Substitutions: ${artifact:<kind>}, ${projectRoot}, ${buildDir}, ${distDir}, ${tiFilename}."
+          }
+        }
+      },
+      {
+        "title": "TI-99: Diagnostics",
+        "properties": {
+          "ti99.diagnostics.unresolvedReferencePolicy": {
+            "type": "string",
+            "enum": [
+              "ignore",
+              "information",
+              "warning",
+              "error"
+            ],
+            "default": "warning",
+            "markdownDescription": "How to report `REF` symbols with no matching `DEF`. Normal for Editor/Assembler option 3 projects, where the cartridge supplies VSBW, VMBW and KSCAN, so `information` is usually right there. Usually a real bug for cartridge and image projects."
+          },
+          "ti99.diagnostics.staticAnalysis": {
+            "type": "boolean",
+            "default": true,
+            "description": "Fast checks as you type: unknown mnemonics, operand counts, duplicate labels, jump range, dialect hazards."
+          }
+        }
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "ti99",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "enum": [
+              "build",
+              "rebuild",
+              "clean",
+              "package",
+              "run"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Path to ti99.json when the workspace holds more than one project."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "xas99",
+        "owner": "ti99",
+        "source": "xas99",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^>\\s+(\\S+)\\s+<[0-9L]+>\\s+(\\d+)\\s+-\\s?(.*)$",
+            "file": 1,
+            "line": 2
+          },
+          {
+            "regexp": "^\\*{5}\\s+(Error|Warning):\\s+(.*)$",
+            "severity": 1,
+            "message": 2
+          }
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ti99",
+          "title": "TI-99",
+          "icon": "resources/ti99.svg"
+        }
+      ]
+    },
+    "views": {
+      "ti99": [
+        {
+          "id": "ti99.project",
+          "name": "Project"
+        },
+        {
+          "id": "ti99.symbols",
+          "name": "Symbols"
+        },
+        {
+          "id": "ti99.artifacts",
+          "name": "Artifacts"
+        },
+        {
+          "id": "ti99.disk",
+          "name": "Disk"
+        }
+      ]
+    },
+    "configurationDefaults": {
+      "[tms9900]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 8,
+        "editor.detectIndentation": false,
+        "editor.formatOnSave": false,
+        "editor.wordBasedSuggestions": "off"
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^5.3.0"
+  },
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1C2026",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR-GITHUB-USER/ti99-dev-suite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR-GITHUB-USER/ti99-dev-suite/issues"
+  },
+  "homepage": "https://github.com/YOUR-GITHUB-USER/ti99-dev-suite#readme",
+  "qna": "marketplace",
+  "badges": [],
+  "extensionKind": [
+    "workspace"
+  ]
+}

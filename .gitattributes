@@ -1,0 +1,10 @@
+# Keep LF everywhere. The TypeScript sources compile byte-identical to the
+# shipped 0.1.2 build, and a CRLF checkout would silently break that.
+* text=auto eol=lf
+
+*.a99 text eol=lf
+*.asm text eol=lf
+
+*.png  binary
+*.vsix binary
+*.dsk  binary

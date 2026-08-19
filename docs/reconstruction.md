@@ -13,9 +13,18 @@ Bin. Only the build outputs survived.
 | Packaged builds 0.1.0 / 0.1.1 / 0.1.2 | `%USERPROFILE%\Downloads\*.vsix` |
 | Design docs | [requirements.md](requirements.md), [deep-dive.md](deep-dive.md) |
 
-That first folder name is literal, not a stale placeholder: 0.1.2 was packaged
-while `publisher` still said `your-publisher-id`, so that is the identity it was
-installed under. It stays the reference build now that `publisher` is set.
+That first folder no longer exists. 0.1.2 was packaged while `publisher` still
+said `your-publisher-id`, so that was the identity it installed under; setting
+`publisher` to `kenfitz` changed the identity, and the old copy was uninstalled
+rather than left alongside the new one (VS Code keys extensions on
+`publisher.name`, so both would otherwise load at once and register the
+`tms9900` language twice).
+
+**Use `Downloads/ti99-dev-suite-0.1.2.vsix` as the comparison baseline.** Its
+seventeen `extension/out/*.js` entries were confirmed byte-identical to that
+install directory before it was removed, and being an immutable file it is the
+better reference anyway. It is the only surviving artifact of the original
+build — do not delete it.
 
 No source maps and no `src/` directory were present in any `.vsix`, so the
 TypeScript was rewritten from the compiled JavaScript. That was tractable because

@@ -13,6 +13,10 @@ Bin. Only the build outputs survived.
 | Packaged builds 0.1.0 / 0.1.1 / 0.1.2 | `%USERPROFILE%\Downloads\*.vsix` |
 | Design docs | [requirements.md](requirements.md), [deep-dive.md](deep-dive.md) |
 
+That first folder name is literal, not a stale placeholder: 0.1.2 was packaged
+while `publisher` still said `your-publisher-id`, so that is the identity it was
+installed under. It stays the reference build now that `publisher` is set.
+
 No source maps and no `src/` directory were present in any `.vsix`, so the
 TypeScript was rewritten from the compiled JavaScript. That was tractable because
 the build preserved comments and the module layout: `out/` had the same seventeen
@@ -39,17 +43,32 @@ npm run compile
 ```
 
 - All **17 emitted modules are byte-identical** to the shipped 0.1.2 build.
-- `npx vsce package` produces a `.vsix` whose **31 files are byte-identical** to
-  `ti99-dev-suite-0.1.2.vsix`.
+- `npx vsce package` produces a `.vsix` with the **same 31 entries**, of which
+  **29 are byte-identical** to `ti99-dev-suite-0.1.2.vsix`.
 
-That equality is the correctness argument for this reconstruction, and it is
-worth re-checking after any refactor that is meant to be behaviour-preserving.
+The two that differ are `extension/package.json` and `extension.vsixmanifest`,
+and they differ *only* by the publisher/repository substitution recorded below —
+no other line changes. That is an intended edit, not drift.
 
-## Known placeholders, carried over from the original
+This equality is the correctness argument for the reconstruction, and it is worth
+re-checking after any refactor meant to be behaviour-preserving. The 17-module
+comparison is the sensitive one: compiler output is unaffected by metadata, so it
+should stay at 17/17 forever unless you actually changed behaviour.
 
-These were never filled in and are unchanged here:
+## Placeholders
 
-- `publisher` is `your-publisher-id`
-- `repository`, `bugs` and `homepage` point at `YOUR-GITHUB-USER`
+`publisher`, `repository`, `bugs` and `homepage` were never filled in in the
+original. They are now set to `kenfitz`. The Marketplace publisher ID must match
+a publisher actually registered at <https://marketplace.visualstudio.com/manage>;
+if you register a different ID, update `publisher` to match.
 
-They must be set to real values before publishing. See [publishing.md](publishing.md).
+Still outstanding: `LICENSE.txt` carries `Copyright (c) 2026 <YOUR NAME>` and
+needs your real name. See [publishing.md](publishing.md).
+
+## Packaging fix
+
+`docs/` was written as part of this reconstruction and did not exist in 0.1.2.
+`.vscodeignore` had no rule for it, so `vsce package` began sweeping all five
+files — 110 KB of internal design and reconstruction notes — into the shipped
+extension. `docs/**` and `.gitattributes` are now excluded, which is what
+restores the 31-entry package above.

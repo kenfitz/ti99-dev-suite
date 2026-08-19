@@ -56,7 +56,7 @@ code --install-extension ti99-dev-suite-0.1.0.vsix
 
 To remove it:
 ```bash
-code --uninstall-extension your-publisher-id.ti99-dev-suite
+code --uninstall-extension kenfitz.ti99-dev-suite
 ```
 
 ## Option C — share the .vsix with a few people
@@ -131,19 +131,20 @@ Store it in a password manager. Anyone with this token can publish as you.
 
 ## Step 4 — Fill in the placeholders
 
-Search the project for these and replace every one:
-
-| Placeholder | Where | Replace with |
+| Placeholder | Where | Status |
 |---|---|---|
-| `your-publisher-id` | `package.json` → `publisher` | Your publisher ID from step 3 |
-| `YOUR-GITHUB-USER` | `package.json` → `repository`, `bugs`, `homepage` | Your GitHub user or org |
-| `<YOUR NAME>` | `LICENSE` | Your name |
+| `your-publisher-id` | `package.json` → `publisher` | **done** — set to `kenfitz` |
+| `YOUR-GITHUB-USER` | `package.json` → `repository`, `bugs`, `homepage` | **done** — set to `kenfitz` |
+| `<YOUR NAME>` | `LICENSE.txt` → copyright line | **outstanding** — needs your real name |
 
-The `publisher` field must match your publisher ID exactly or publishing fails.
+The `publisher` field must match your Marketplace publisher ID exactly or
+publishing fails. `kenfitz` is recorded here on the assumption that you register
+that ID at <https://marketplace.visualstudio.com/manage>; if you end up with a
+different one, change `publisher` to match before the first `vsce publish`.
 
-Push the repository to GitHub before publishing. The Marketplace renders your
-`README.md` on the extension page, and relative image links only resolve if the
-repository URL is correct and public.
+The GitHub repository is private. Make it public before publishing: the
+Marketplace renders `README.md` on the extension page, and relative image links
+and the repository/issues links only resolve against a public repo.
 
 ## Step 5 — Check what will actually ship
 
@@ -171,7 +172,7 @@ package.
 ## Step 6 — Publish
 
 ```bash
-vsce login your-publisher-id      # paste the PAT when prompted
+vsce login kenfitz                # paste the PAT when prompted
 vsce publish
 ```
 
@@ -182,7 +183,7 @@ vsce publish -p <your-pat>
 ```
 
 The extension appears at
-`https://marketplace.visualstudio.com/items?itemName=your-publisher-id.ti99-dev-suite`
+`https://marketplace.visualstudio.com/items?itemName=kenfitz.ti99-dev-suite`
 within a few minutes. Indexing for search can take up to an hour.
 
 ## Step 7 — Publishing updates

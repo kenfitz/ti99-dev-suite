@@ -1,9 +1,11 @@
 .vscode/**
 .github/**
 src/**
+docs/**
 node_modules/**
 tsconfig.json
 .gitignore
+.gitattributes
 .vscodeignore
 out/**/*.map
 **/*.ts

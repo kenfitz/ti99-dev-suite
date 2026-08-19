@@ -2,7 +2,27 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Extension",
+      // Default F5: opens the dev host with the snake test project already
+      // loaded, so the extension activates on a real ti99.json immediately.
+      //
+      // The packaged copy (kenfitz.ti99-dev-suite) is installed with the same
+      // extension ID. VS Code resolves the --extensionDevelopmentPath build as
+      // the winner for a given ID, so the dev version is what runs. If you ever
+      // see duplicated TI-99 commands in the dev host, that resolution failed —
+      // uninstall the packaged copy, F5 does not need it.
+      "name": "Run Extension (snake project)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/../ti99-snake"
+      ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile"
+    },
+    {
+      // Empty window, for testing the New Project / Import wizards from scratch.
+      "name": "Run Extension (empty window)",
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],

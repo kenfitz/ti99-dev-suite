@@ -10,7 +10,7 @@ export type ProjectType = 'cartridge-rpk' | 'cartridge-bin' | 'ea5-image' | 'ea3
 export type Capability =
     | 'assemble' | 'link' | 'listing' | 'symbols'
     | 'cart-rpk' | 'cart-bin' | 'ea3-object' | 'ea5-image'
-    | 'disk-image' | 'tifiles';
+    | 'disk-image' | 'tifiles' | 'basic-program';
 
 export type Processor = '9900' | '9995' | '99000' | 'f18a';
 
@@ -63,8 +63,102 @@ export interface ProjectConfig {
     emulatorProfile?: string;
     cartridge?: CartridgeOptions;
     disk?: DiskOptions;
+    /**
+     * TI BASIC / Extended BASIC source to tokenise for the 'basic-program'
+     * capability. An Extended BASIC boot disk needs a program called LOAD,
+     * which XB runs at power-up; this is where that program comes from.
+     */
+    basicSource?: string;
+    /** On-disk name for the tokenised program. Defaults to LOAD. */
+    basicName?: string;
     assembler: AssemblerOptions;
+    /** Distribution routes. Omit for a single-output project. */
+    targets?: TargetConfig[];
 }
+/**
+ * One distribution route.
+ *
+ * A target is a partial override of the project config: it names its own
+ * entry source, output set and dist folder, and inherits everything else.
+ * Merging a target onto the base produces an ordinary ProjectConfig, so the
+ * build path below it is unchanged and a project without targets behaves
+ * exactly as before.
+ */
+export interface TargetConfig {
+    /** Stable identifier, used on the command line and in the build cache. */
+    id: string;
+    /** Shown in the target picker. Defaults to the id. */
+    label?: string;
+    description?: string;
+    type?: ProjectType;
+    entrySource?: string;
+    sources?: string[];
+    includePaths?: string[];
+    defines?: Record<string, string>;
+    outputs?: Capability[];
+    buildDir?: string;
+    distDir?: string;
+    emulatorProfile?: string;
+    cartridge?: CartridgeOptions;
+    disk?: DiskOptions;
+    basicSource?: string;
+    basicName?: string;
+    assembler?: Partial<AssemblerOptions>;
+}
+
+/** Target ids in declaration order. Empty when the project has no targets. */
+export function targetIds(cfg: ProjectConfig): string[] {
+    return (cfg.targets ?? []).map(t => t.id);
+}
+
+export function findTarget(cfg: ProjectConfig, id: string): TargetConfig | undefined {
+    return (cfg.targets ?? []).find(t => t.id === id);
+}
+
+/**
+ * Merge a target onto the base config.
+ *
+ * With no targets, or no id, this returns the base unchanged, which is what
+ * keeps single-target projects working. An unknown id is an error rather than
+ * a silent fallback: building the wrong thing is worse than not building.
+ */
+export function resolveTarget(cfg: ProjectConfig, id?: string): ProjectConfig {
+    const targets = cfg.targets ?? [];
+    if (targets.length === 0) return cfg;
+
+    const target = id ? findTarget(cfg, id) : targets[0];
+    if (!target) {
+        throw new Error(
+            `Unknown target '${id}'. This project defines: ${targetIds(cfg).join(', ')}.`);
+    }
+
+    // entrySource is the usual reason a target exists, so when it is overridden
+    // without an explicit source list, the entry becomes the source list.
+    const sources = target.sources
+        ?? (target.entrySource ? [target.entrySource] : cfg.sources);
+
+    return {
+        ...cfg,
+        type: target.type ?? cfg.type,
+        entrySource: target.entrySource ?? cfg.entrySource,
+        sources,
+        includePaths: target.includePaths ?? cfg.includePaths,
+        defines: target.defines ?? cfg.defines,
+        outputs: target.outputs ?? cfg.outputs,
+        buildDir: target.buildDir ?? cfg.buildDir,
+        distDir: target.distDir ?? cfg.distDir,
+        emulatorProfile: target.emulatorProfile ?? cfg.emulatorProfile,
+        cartridge: target.cartridge ?? cfg.cartridge,
+        disk: target.disk ?? cfg.disk,
+        basicSource: target.basicSource ?? cfg.basicSource,
+        basicName: target.basicName ?? cfg.basicName,
+        assembler: { ...cfg.assembler, ...target.assembler },
+        // A resolved target is a plain config. Dropping the list prevents a
+        // second resolve from being applied on top of the first.
+        targets: undefined,
+    };
+}
+
 
 export interface ValidationIssue {
     field: string;
@@ -140,6 +234,41 @@ export function validate(cfg: ProjectConfig): ValidationIssue[] {
             message: 'TI volume names are at most 10 characters and cannot contain spaces or punctuation other than . and _.',
             severity: 'error',
         });
+    }
+
+    // Validate each target by resolving it and validating the result, so a
+    // target cannot pass by inheriting a field it actually overrides badly.
+    const seen = new Set<string>();
+    for (const target of cfg.targets ?? []) {
+        if (!target.id) {
+            issues.push({ field: 'targets[].id', message: 'Every target needs an id.', severity: 'error' });
+            continue;
+        }
+        if (seen.has(target.id)) {
+            issues.push({
+                field: `targets.${target.id}`,
+                message: `Duplicate target id '${target.id}'.`,
+                severity: 'error',
+            });
+            continue;
+        }
+        seen.add(target.id);
+
+        // Guard against a target writing its artifacts on top of another's.
+        const clash = (cfg.targets ?? []).find(
+            o => o !== target && o.id && (o.distDir ?? cfg.distDir) === (target.distDir ?? cfg.distDir));
+        if (clash) {
+            issues.push({
+                field: `targets.${target.id}.distDir`,
+                message: `Targets '${target.id}' and '${clash.id}' share distDir ` +
+                    `'${target.distDir ?? cfg.distDir}'; their artifacts would overwrite each other.`,
+                severity: 'warning',
+            });
+        }
+
+        for (const issue of validate(resolveTarget(cfg, target.id))) {
+            issues.push({ ...issue, field: `targets.${target.id}.${issue.field}` });
+        }
     }
 
     return issues;

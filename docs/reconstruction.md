@@ -51,15 +51,11 @@ Verification, reproducible at any time:
 npm run compile
 ```
 
-- **16 of the 17** emitted modules are byte-identical to the shipped 0.1.2
-  build. The seventeenth, `out/lang/dialect.js`, was changed deliberately — see
-  *Intentional divergence* below.
-- `npx vsce package` produces a `.vsix` with the **same 31 entries**, of which
-  **28 are byte-identical** to `ti99-dev-suite-0.1.2.vsix`.
-
-The three that differ are `extension/package.json` and `extension.vsixmanifest`,
-which differ *only* by the publisher/repository substitution recorded below, and
-`extension/out/lang/dialect.js`. All three are intended edits, not drift.
+- **12 of the 17** emitted modules are byte-identical to the shipped 0.1.2
+  build. Five have been changed deliberately — see *Intentional divergence*
+  below.
+- `npx vsce package` produces a `.vsix` with the **same 31 entries**. No file
+  appears or disappears; only the deliberately changed ones differ.
 
 This equality is the correctness argument for the reconstruction, and it is worth
 re-checking after any refactor meant to be behaviour-preserving. The module
@@ -68,12 +64,41 @@ anything beyond the known divergence means you changed behaviour.
 
 ## Intentional divergence from 0.1.2
 
-The baseline is no longer 17/17. One module has deliberately changed:
+Twelve of the seventeen modules remain byte-identical. Five have changed on
+purpose:
 
-| Module | Status |
+| Module | Why |
 |---|---|
-| `out/lang/dialect.js` | **changed on purpose** — bug fix, see below |
-| the other 16 | byte-identical to 0.1.2 |
+| `out/lang/dialect.js` | hazard-detection bug fix (below) |
+| `out/config/project.js` | `targets`, `resolveTarget`, `basic-program` capability |
+| `out/build/coordinator.js` | target-aware build and clean, `${input}`/`${fileType}` |
+| `out/toolchain/profiles.js` | `basic-program` command (xbas99) |
+| `out/extension.js` | Build Target / Rebuild Target commands |
+
+### Multi-target builds
+
+A project may now declare `targets`: distribution routes that each override
+part of the config. `resolveTarget` merges one onto the base and returns an
+ordinary `ProjectConfig`, so everything below it is unchanged and a project
+without targets behaves exactly as before. The build cache is keyed
+`targetId:capability`, and `clean` removes the union of every target's build
+and dist folders rather than only the base pair.
+
+Two pre-existing bugs surfaced while wiring this up, both found by generating
+the command lines through the real `resolve()` rather than by reading it:
+
+- **`tifiles` could never have worked.** The profile template referenced
+  `${input}` and `${fileType}`, but neither was in the scalar map, so the
+  command expanded to `xdm99.py -T -f -o out.tfi` — no input file and no file
+  type. Both values are now supplied. `tifiles` wraps the memory image when the
+  target builds one, since that auto-starts under E/A option 5, and otherwise
+  the tagged object, which is what Extended BASIC's `CALL LOAD` reads.
+- **Nothing could tokenise a BASIC program.** An Extended BASIC boot disk needs
+  a program named `LOAD`, which XB runs at power-up. The new `basic-program`
+  capability calls `xbas99.py -c`, and `disk.files` can reference it like any
+  other artifact.
+
+### Dialect hazard detection
 
 `detectDialect` counted dialect hazards with a regex over the raw source line.
 It had four defects, each demonstrable on a real file:

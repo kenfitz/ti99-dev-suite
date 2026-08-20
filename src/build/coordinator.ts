@@ -11,6 +11,7 @@ import type { ToolchainState } from '../toolchain/discovery';
 import { parseXas99, parseXdm99 } from './diagnostics';
 import type { ParsedDiagnostic } from './diagnostics';
 import { DIALECTS } from '../lang/dialect';
+import { resolveTarget } from '../config/project';
 import type { Project } from '../config/loader';
 import type { Capability, UnresolvedPolicy } from '../config/project';
 
@@ -45,10 +46,13 @@ export interface BuildOptions {
     rebuild?: boolean;
     /** Build only these capabilities instead of the project's full output set. */
     only?: Capability[];
+    /** Distribution route to build. Ignored by projects with no targets. */
+    target?: string;
 }
 
 export class BuildCoordinator {
-    private cache = new Map<Capability, string>();
+    // Keyed 'targetId:capability' - two targets can emit the same capability.
+    private cache = new Map<string, string>();
 
     constructor(
         private readonly output: vscode.OutputChannel,
@@ -72,6 +76,24 @@ export class BuildCoordinator {
 
         if (options.rebuild) this.invalidate();
 
+        // Resolve the requested distribution route. A project with no targets
+        // resolves to itself, which is why single-target projects are unaffected.
+        let effective = project;
+        const hasTargets = (project.config.targets ?? []).length > 0;
+        if (hasTargets) {
+            try {
+                effective = { ...project, config: resolveTarget(project.config, options.target) };
+            } catch (err) {
+                this.output.appendLine(`Build aborted: ${(err as Error).message}`);
+                return { success: false, cancelled: false, artifacts, diagnostics: [], durationMs: 0, steps };
+            }
+        }
+        const targetId = hasTargets
+            ? (options.target ?? project.config.targets![0].id)
+            : '';
+        const key = (c: Capability): string => (targetId ? `${targetId}:${c}` : c);
+        if (targetId) this.output.appendLine(`Target: ${targetId}`);
+
         const blocking = project.issues.filter(i => i.severity === 'error');
         if (blocking.length) {
             this.output.appendLine('Build aborted: project configuration is not valid.');
@@ -88,7 +110,7 @@ export class BuildCoordinator {
             return { success: false, cancelled: false, artifacts, diagnostics: [], durationMs: 0, steps };
         }
 
-        const wanted = options.only ?? project.config.outputs;
+        const wanted = options.only ?? effective.config.outputs;
         const profile = toolchain.tool.profile;
 
         const unsupported = wanted.filter(c => !profile.capabilities.includes(c));
@@ -99,7 +121,7 @@ export class BuildCoordinator {
             return { success: false, cancelled: false, artifacts, diagnostics: [], durationMs: 0, steps };
         }
 
-        await this.ensureDirs(project);
+        await this.ensureDirs(effective);
         this.diagnostics.clear();
 
         for (const capability of wanted) {
@@ -113,10 +135,10 @@ export class BuildCoordinator {
                 continue;
             }
 
-            const { program, args, outputPath } = this.resolve(project, toolchain, capability, command);
-            const hash = this.hashStep(project, program, args);
+            const { program, args, outputPath } = this.resolve(effective, toolchain, capability, command);
+            const hash = this.hashStep(effective, program, args);
 
-            if (!options.rebuild && this.cache.get(capability) === hash && verifyArtifact(outputPath).ok) {
+            if (!options.rebuild && this.cache.get(key(capability)) === hash && verifyArtifact(outputPath).ok) {
                 this.output.appendLine(`${capability}: up to date`);
                 artifacts.push(this.describeArtifact(capability, outputPath));
                 continue;
@@ -128,7 +150,7 @@ export class BuildCoordinator {
             const result = await run({
                 program,
                 args,
-                cwd: project.root.fsPath,
+                cwd: effective.root.fsPath,
                 onOutput: chunk => this.output.append(chunk),
             }, token);
 
@@ -137,10 +159,10 @@ export class BuildCoordinator {
 
             const parsed = command.problemMatcher === 'xdm99'
                 ? parseXdm99(result.stderr)
-                : parseXas99(result.stderr, path.basename(project.config.entrySource));
+                : parseXas99(result.stderr, path.basename(effective.config.entrySource));
 
             allDiagnostics.push(...parsed.diagnostics);
-            this.publish(project, parsed.diagnostics);
+            this.publish(effective, parsed.diagnostics);
 
             if (result.cancelled) {
                 return { success: false, cancelled: true, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
@@ -156,17 +178,17 @@ export class BuildCoordinator {
             if (!ok) {
                 if (artifactCheck.reason) this.output.appendLine(`  ${artifactCheck.reason}`);
                 this.output.appendLine(`  ${parsed.uniqueErrorCount} error(s), ${parsed.uniqueWarningCount} warning(s)`);
-                this.cache.delete(capability);
+                this.cache.delete(key(capability));
                 return { success: false, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
             }
 
-            this.cache.set(capability, hash);
+            this.cache.set(key(capability), hash);
             if (outputPath) artifacts.push(this.describeArtifact(capability, outputPath));
         }
 
         // Disk projects assemble first, then the image is populated.
-        if (project.config.type === 'disk' && project.config.disk) {
-            const added = await this.populateDisk(project, toolchain, artifacts, token);
+        if (effective.config.type === 'disk' && effective.config.disk) {
+            const added = await this.populateDisk(effective, toolchain, artifacts, token);
             if (!added) {
                 return { success: false, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
             }
@@ -185,8 +207,17 @@ export class BuildCoordinator {
     async clean(project: Project): Promise<void> {
         const root = project.root.fsPath;
 
+        // Every target may redirect buildDir/distDir, so clean the union of
+        // them. Cleaning only the base would silently strand target artifacts.
+        const dirs = new Set<string>([project.config.buildDir, project.config.distDir]);
+        for (const target of project.config.targets ?? []) {
+            const resolved = resolveTarget(project.config, target.id);
+            dirs.add(resolved.buildDir);
+            dirs.add(resolved.distDir);
+        }
+
         // Hard guard: never delete outside the configured build and dist folders.
-        for (const dir of [project.config.buildDir, project.config.distDir]) {
+        for (const dir of dirs) {
             const target = path.resolve(root, dir);
             if (!target.startsWith(root + path.sep)) {
                 this.output.appendLine(`Refusing to clean ${target}: outside the project root.`);
@@ -231,6 +262,9 @@ export class BuildCoordinator {
             case 'ea5-image': return path.join(dist, tiStem);
             case 'ea3-object': return path.join(dist, `${tiStem.slice(0, 9)}O`);
             case 'disk-image': return path.join(dist, `${stem}.dsk`);
+            // Extended BASIC runs a program called LOAD from DSK1 at power-up,
+            // so that is the default name a boot disk wants.
+            case 'basic-program': return path.join(dist, config.basicName ?? 'LOAD');
             case 'tifiles': return path.join(dist, `${tiStem}.tfi`);
             default: return path.join(build, `${stem}.${capability}`);
         }
@@ -248,6 +282,25 @@ export class BuildCoordinator {
         const outputPath = this.outputPathFor(project, capability);
         const stem = config.name.replace(/[^\w.-]/g, '_');
         const tiStem = config.name.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 10) || 'PROGRAM';
+
+        // ${input} and ${fileType} are referenced by the tifiles and
+        // basic-program templates but had no value, so those commands expanded
+        // to 'xdm99.py -T -f -o out.tfi' and could never have worked.
+        //
+        // tifiles wraps an artifact this same build produces. Prefer the
+        // memory image, which auto-starts under E/A option 5; fall back to the
+        // tagged object, which is what Extended BASIC's CALL LOAD wants. The
+        // path is computed rather than looked up, so ordering within
+        // config.outputs is the only requirement.
+        const wrapped: Capability | undefined =
+            config.outputs.includes('ea5-image') ? 'ea5-image'
+            : config.outputs.includes('ea3-object') ? 'ea3-object'
+            : config.outputs.includes('cart-bin') ? 'cart-bin'
+            : undefined;
+
+        const inputPath = capability === 'basic-program'
+            ? (config.basicSource ? path.resolve(root, config.basicSource) : '')
+            : wrapped ? this.outputPathFor(project, wrapped) : '';
 
         const variables = toolchain.tool!.profile.variables ?? {};
         const pick = (key: string, value: string): string => {
@@ -272,6 +325,8 @@ export class BuildCoordinator {
             cartridgeName: config.cartridge?.name ?? config.name,
             diskGeometry: config.disk?.geometry ?? 'sssd',
             diskName: config.disk?.volumeName ?? tiStem,
+            input: inputPath,
+            fileType: wrapped === 'ea3-object' ? 'DIS/FIX 80' : 'PROGRAM',
         };
 
         const lists: Record<string, string[]> = {

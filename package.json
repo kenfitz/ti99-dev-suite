@@ -79,6 +79,17 @@
         "category": "TI-99"
       },
       {
+        "command": "ti99.buildTarget",
+        "title": "Build Target...",
+        "category": "TI-99",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "ti99.rebuildTarget",
+        "title": "Rebuild Target...",
+        "category": "TI-99"
+      },
+      {
         "command": "ti99.clean",
         "title": "Clean",
         "category": "TI-99"

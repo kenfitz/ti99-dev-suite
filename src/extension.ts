@@ -16,6 +16,7 @@ import type { SyntaxDialect } from './lang/dialect';
 import { ProjectManager } from './config/loader';
 import type { Project } from './config/loader';
 import type { Capability, Processor } from './config/project';
+import { resolveTarget, targetIds } from './config/project';
 import { describeState, discover } from './toolchain/discovery';
 import type { ToolchainState } from './toolchain/discovery';
 import { Cancellation, run } from './toolchain/runner';
@@ -634,8 +635,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
     const register = (id: string, handler: (...args: never[]) => unknown) =>
         context.subscriptions.push(vscode.commands.registerCommand(id, handler));
 
-    register('ti99.build', () => doBuild({ rebuild: false }));
-    register('ti99.rebuild', () => doBuild({ rebuild: true }));
+    register('ti99.build', () => doBuildAll(false));
+    register('ti99.rebuild', () => doBuildAll(true));
+    register('ti99.buildTarget', () => doBuildTarget(false));
+    register('ti99.rebuildTarget', () => doBuildTarget(true));
     register('ti99.clean', doClean);
     register('ti99.run', () => doRun(undefined));
     register('ti99.buildAndRun', doBuildAndRun);
@@ -677,9 +680,37 @@ async function requireReady(): Promise<Project | undefined> {
     return project;
 }
 
-async function doBuild(options: { rebuild: boolean }): Promise<boolean> {
+/** The target chosen for the last build, so Run launches what was built. */
+let lastTarget: string | undefined;
+
+/** A Project whose config is the named target merged onto the base. */
+function forTarget(project: Project, target?: string): Project {
+    if ((project.config.targets ?? []).length === 0) return project;
+    return { ...project, config: resolveTarget(project.config, target) };
+}
+
+async function pickTarget(project: Project, title: string): Promise<string | undefined> {
+    const targets = project.config.targets ?? [];
+    if (targets.length === 0) return undefined;
+    if (targets.length === 1) return targets[0].id;
+
+    const picked = await vscode.window.showQuickPick(
+        targets.map(t => ({
+            label: t.label ?? t.id,
+            description: t.id,
+            detail: t.description ?? `${(t.outputs ?? project.config.outputs).join(', ')} -> ${t.distDir ?? project.config.distDir}`,
+            id: t.id,
+        })),
+        { title, matchOnDetail: true });
+    return picked?.id;
+}
+
+async function doBuild(options: { rebuild: boolean; target?: string }): Promise<boolean> {
     const project = await requireReady();
     if (!project) return false;
+
+    const resolved = forTarget(project, options.target);
+    lastTarget = options.target;
 
     activeBuild?.cancel();
     const token = new Cancellation();
@@ -687,32 +718,34 @@ async function doBuild(options: { rebuild: boolean }): Promise<boolean> {
 
     output.clear();
     output.show(true);
-    output.appendLine(`${options.rebuild ? 'Rebuilding' : 'Building'} ${project.config.name}`);
-    output.appendLine(`  dialect  ${DIALECTS[project.config.syntaxDialect].label}`);
-    output.appendLine(`  outputs  ${project.config.outputs.join(', ')}`);
+    const label = options.target ? `${project.config.name} [${options.target}]` : project.config.name;
+    output.appendLine(`${options.rebuild ? 'Rebuilding' : 'Building'} ${label}`);
+    output.appendLine(`  dialect  ${DIALECTS[resolved.config.syntaxDialect].label}`);
+    output.appendLine(`  outputs  ${resolved.config.outputs.join(', ')}`);
 
     return vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `TI-99: building ${project.config.name}`,
+        title: `TI-99: building ${label}`,
         cancellable: true,
     }, async (_progress, cancelToken) => {
         cancelToken.onCancellationRequested(() => token.cancel());
         statusBar.building('Building');
 
-        const result = await coordinator.build(project, toolchain, { rebuild: options.rebuild }, token);
+        const result = await coordinator.build(
+            project, toolchain, { rebuild: options.rebuild, target: options.target }, token);
         lastBuild = result;
         activeBuild = undefined;
 
         statusBar.built(result.success, result.durationMs);
         artifactsView.set(result.artifacts);
 
-        const equ = path.resolve(project.root.fsPath, project.config.buildDir, `${stem(project)}.equ`);
+        const equ = path.resolve(resolved.root.fsPath, resolved.config.buildDir, `${stem(resolved)}.equ`);
         if (fs.existsSync(equ)) symbolsView.loadFromEquFile(equ);
 
         if (result.success) {
-            const warning = EmulatorLauncher.checkClassic99Naming(project, result.artifacts);
+            const warning = EmulatorLauncher.checkClassic99Naming(resolved, result.artifacts);
             if (warning) void vscode.window.showWarningMessage(`TI-99: ${warning}`);
-            void refreshDiskCatalog(project, result.artifacts);
+            void refreshDiskCatalog(resolved, result.artifacts);
         } else if (!result.cancelled) {
             void vscode.window
                 .showErrorMessage('TI-99: build failed. See the Problems panel.', 'Show Output')
@@ -721,6 +754,50 @@ async function doBuild(options: { rebuild: boolean }): Promise<boolean> {
 
         return result.success;
     });
+}
+
+/** Build one route, chosen from the picker. */
+async function doBuildTarget(rebuild: boolean): Promise<boolean> {
+    const project = await requireReady();
+    if (!project) return false;
+    if ((project.config.targets ?? []).length === 0) {
+        void vscode.window.showInformationMessage(
+            'This project defines no targets. Use TI-99: Build.');
+        return doBuild({ rebuild });
+    }
+    const target = await pickTarget(project, 'Which distribution route?');
+    if (!target) return false;
+    return doBuild({ rebuild, target });
+}
+
+/**
+ * Build every route in declaration order.
+ *
+ * One failure stops the run: a half-built distribution set is more misleading
+ * than an obvious stop, and the output channel already names the target that
+ * failed.
+ */
+async function doBuildAll(rebuild: boolean): Promise<boolean> {
+    const project = await requireReady();
+    if (!project) return false;
+
+    const ids = targetIds(project.config);
+    if (ids.length === 0) return doBuild({ rebuild });
+
+    const done: string[] = [];
+    for (const id of ids) {
+        const ok = await doBuild({ rebuild, target: id });
+        if (!ok) {
+            void vscode.window.showErrorMessage(
+                `TI-99: target '${id}' failed. Built: ${done.join(', ') || 'none'}.`);
+            return false;
+        }
+        done.push(id);
+    }
+
+    void vscode.window.showInformationMessage(
+        `TI-99: built ${done.length} target(s) — ${done.join(', ')}.`);
+    return true;
 }
 
 async function doClean(): Promise<boolean> {
@@ -738,8 +815,12 @@ async function doClean(): Promise<boolean> {
 }
 
 async function doRun(artifacts: Artifact[] | undefined): Promise<boolean> {
-    const project = await projects.require();
-    if (!project) return false;
+    const base = await projects.require();
+    if (!base) return false;
+
+    // Launch the route that was actually built. Each target carries its own
+    // emulator profile, so using the base config here would pick the wrong one.
+    const project = forTarget(base, lastTarget);
 
     const available = artifacts ?? lastBuild?.artifacts ?? [];
     if (available.length === 0) {
@@ -754,7 +835,17 @@ async function doRun(artifacts: Artifact[] | undefined): Promise<boolean> {
 }
 
 async function doBuildAndRun(): Promise<boolean> {
-    const ok = await doBuild({ rebuild: false });
+    const project = await requireReady();
+    if (!project) return false;
+
+    // Running needs one specific route: each target has its own emulator
+    // profile and its own artifacts.
+    const target = (project.config.targets ?? []).length
+        ? await pickTarget(project, 'Which route do you want to run?')
+        : undefined;
+    if ((project.config.targets ?? []).length && !target) return false;
+
+    const ok = await doBuild({ rebuild: false, target });
     if (!ok) return false;
     return doRun(lastBuild?.artifacts);
 }

@@ -62,7 +62,7 @@ export const XDT99_PROFILE: ToolProfile = {
     capabilities: [
         'assemble', 'link', 'listing', 'symbols',
         'cart-rpk', 'cart-bin', 'ea3-object', 'ea5-image',
-        'disk-image', 'tifiles',
+        'disk-image', 'tifiles', 'basic-program',
     ],
     detect: {
         files: ['xas99.py'],
@@ -142,6 +142,17 @@ export const XDT99_PROFILE: ToolProfile = {
             ],
             cwd: '${projectRoot}',
             problemMatcher: 'xas99',
+            successRequiresArtifact: '${output}',
+        },
+        // Tokenise a TI BASIC / Extended BASIC program. An XB boot disk needs
+        // a program called LOAD, which XB runs automatically at power-up.
+        'basic-program': {
+            program: '${python}',
+            args: ['${tool}/xbas99.py', '-c', '${input}', '-o', '${output}'],
+            cwd: '${projectRoot}',
+            // xbas99 reports its own errors; the coordinator falls back to the
+            // xdm99 parser, which leaves unmatched lines in the output channel.
+            problemMatcher: 'xdm99',
             successRequiresArtifact: '${output}',
         },
         'disk-image': {

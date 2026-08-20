@@ -145,6 +145,31 @@ export const CLASSIC99_XB: EmulatorProfile = {
         'itself. Cartridge ROMs are not distributed with the extension.',
 };
 
+/**
+ * A distribution disk rather than a development drop: the .dsk is the
+ * deliverable, so nothing is staged into a FIAD folder. Classic99 has no
+ * command line for mounting a disk, so inserting it is a manual step - which
+ * is what it was on real hardware too.
+ */
+export const CLASSIC99_EA_DISK: EmulatorProfile = {
+    id: 'classic99-eadisk',
+    displayName: 'Classic99 — Editor/Assembler cartridge + disk image',
+    kind: 'process',
+    accepts: ['disk-image'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: ['-rom', '${config:ti99.emulator.classic99EaRom}'],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99EaRom'],
+    hint: 'Editor/Assembler loaded. Insert the disk: Disk > DSK1 > open ' +
+        '${artifact:disk-image} — then press a key, choose 2, then 5 ' +
+        '(RUN PROGRAM FILE) and enter DSK1.${tiFilename}.',
+    notes: 'The disk image is the distribution artifact. Mount it as DSK1 in ' +
+        'Classic99, or write it to a real floppy with xdm99. Cartridge ROMs are ' +
+        'not distributed with the extension.',
+};
+
 export const MAME_CART: EmulatorProfile = {
     id: 'mame-cart',
     displayName: 'MAME — cartridge (RPK)',
@@ -219,7 +244,7 @@ export const CUSTOM_EMULATOR: EmulatorProfile = {
 };
 
 export const BUILTIN_EMULATORS: EmulatorProfile[] = [
-    CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_XB, CLASSIC99_DISK,
+    CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_EA_DISK, CLASSIC99_XB, CLASSIC99_DISK,
     MAME_CART, MAME_DISK,
     JS99ER, WIN994A, CUSTOM_EMULATOR,
 ];

@@ -14,9 +14,19 @@ $ xas99.py -R -s -c snakeC.a99 -o snake.rpk
    -> snake.rpk written                       <- strict syntax
 ```
 
-Hazard lines found by the shipped detector (19 total):
-159, 161, 163, 165, 241, 272, 292, 299, 323, 347, 356, 362, 437, 449, 498,
-656, 658, 672, 710
+Hazard lines in `snakeC.a99` (12 total):
+159, 161, 163, 165, 241, 292, 347, 356, 498, 656, 658, 710
+
+That set is **exactly** the set of lines xas99 reports an `Error` on in
+extended mode — verified by pairing each `<2> NNNN` line in its output with the
+severity on the following line. Not a heuristic that happens to agree: the same
+twelve lines, no more and no fewer.
+
+> An earlier revision of this file listed 19 lines here, adding 272, 299, 323,
+> 362, 437, 449 and 672. Those seven have no comment field at all
+> (`LOOP02 MOVB @FALSE,@KEYPRS`) and are not hazards. The figure came from the
+> regex heuristic in `detectDialect`, which has since been replaced by the
+> field parser — see [reconstruction.md](reconstruction.md).
 
 Cause: a single blank between the operand and a `*` comment. xas99's extended
 syntax requires two blanks or a tab, so the blank is read as part of the
@@ -104,11 +114,21 @@ the unambiguous majority.
 
 ## 7. Dialect detection
 
+Run over `snakeC.a99`:
+
 ```
 { dialect: 'ea',
   confidence: 1,
-  reason: '13 line(s) separate a comment from the operand by a single blank,
+  reason: '12 line(s) separate a comment from the operand by a single blank,
            which only assembles with -s (strict).' }
+```
+
+Over `snake-a.a99`, which has no hazards:
+
+```
+{ dialect: 'ea',
+  confidence: 0.3,
+  reason: 'No strong signal; defaulting to the compatible dialect.' }
 ```
 
 ## 8. Starter template

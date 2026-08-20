@@ -51,18 +51,81 @@ Verification, reproducible at any time:
 npm run compile
 ```
 
-- All **17 emitted modules are byte-identical** to the shipped 0.1.2 build.
+- **16 of the 17** emitted modules are byte-identical to the shipped 0.1.2
+  build. The seventeenth, `out/lang/dialect.js`, was changed deliberately — see
+  *Intentional divergence* below.
 - `npx vsce package` produces a `.vsix` with the **same 31 entries**, of which
-  **29 are byte-identical** to `ti99-dev-suite-0.1.2.vsix`.
+  **28 are byte-identical** to `ti99-dev-suite-0.1.2.vsix`.
 
-The two that differ are `extension/package.json` and `extension.vsixmanifest`,
-and they differ *only* by the publisher/repository substitution recorded below —
-no other line changes. That is an intended edit, not drift.
+The three that differ are `extension/package.json` and `extension.vsixmanifest`,
+which differ *only* by the publisher/repository substitution recorded below, and
+`extension/out/lang/dialect.js`. All three are intended edits, not drift.
 
 This equality is the correctness argument for the reconstruction, and it is worth
-re-checking after any refactor meant to be behaviour-preserving. The 17-module
-comparison is the sensitive one: compiler output is unaffected by metadata, so it
-should stay at 17/17 forever unless you actually changed behaviour.
+re-checking after any refactor meant to be behaviour-preserving. The module
+comparison is the sensitive one: compiler output is unaffected by metadata, so
+anything beyond the known divergence means you changed behaviour.
+
+## Intentional divergence from 0.1.2
+
+The baseline is no longer 17/17. One module has deliberately changed:
+
+| Module | Status |
+|---|---|
+| `out/lang/dialect.js` | **changed on purpose** — bug fix, see below |
+| the other 16 | byte-identical to 0.1.2 |
+
+`detectDialect` counted dialect hazards with a regex over the raw source line.
+It had four defects, each demonstrable on a real file:
+
+1. Its guard against indirect addressing, `!/^\s*\S+\s+\S*\*[Rr]/`, expects the
+   first field to be the mnemonic. On a *labelled* line the first field is the
+   label, so the guard can never fire — `VMBWLP MOVB *R1+,@VDPWD` was counted as
+   a hazard while the identical unlabelled line was not.
+2. A `*` inside a `;` comment counted, so a `DATA` row documenting ASCII 42
+   registered as a hazard.
+3. The separator test used `\s`, which matches a tab. A tab is a *legal*
+   extended-syntax separator, so tab-aligned comments were flagged.
+4. The guard was line-scoped, so any `*Rn` anywhere on a line suppressed a real
+   hazard elsewhere on that same line — a false negative, the direction that
+   actually costs a broken build.
+
+`splitLine` in `lang/formatter.ts` already parsed the line into fields properly,
+tracking quoted literals, `''` escapes, tab separators and no-operand opcodes.
+`findDialectHazards` used it; `detectDialect` did not. The fix deletes the regex
+and calls the parser, so there is one implementation rather than two. The
+semicolon count in the same function now goes through the parser too, so a `;`
+inside a `TEXT` literal is no longer read as a comment.
+
+The import direction is safe: `formatter.ts` refers to `dialect.ts` only through
+`import type`, which the compiler erases — `out/lang/formatter.js` has no runtime
+`require("./dialect")`, so there is no cycle.
+
+### Evidence
+
+The parser's hazard set for `snakeC.a99` is *exactly* the set of lines xas99
+rejects in extended mode — 12 lines, no more and no fewer. For `snake-a.a99` it
+reports zero, which is independently confirmed: that file assembles at exit 0
+under extended syntax and yields an object byte-identical to the strict build,
+so nothing in it is misparsed. The old regex claimed 2.
+
+| File | old regex | fixed | xas99 errors |
+|---|---|---|---|
+| `snake-a.a99` | 2 | 0 | 0 |
+| `snakeC.a99` | 13 | 12 | 12 |
+| `tombstone.a99` | 90 | 91 | — |
+| `template.a99` | 4 | 4 | — |
+
+Note `tombstone.a99` went *up*: defect 4 had been hiding a genuine hazard on
+line 1418, `MOV @GENREL,*R8+ * PUT MONST IN TABLE`, where `*R8+` is a real
+operand and the trailing `* PUT MONST` is a real single-blank comment.
+
+### What this means for verification
+
+The 16 unchanged modules must stay byte-identical; that check still holds and
+still catches accidental drift. `dialect.js` is now out of the comparison, and
+its correctness rests on the xas99 cross-check above rather than on equality
+with 0.1.2. Re-run that cross-check if you touch dialect or formatter.
 
 ## Placeholders
 

@@ -1,3 +1,5 @@
+import { findDialectHazards, splitLine } from './formatter';
+
 export type SyntaxDialect = 'ea' | 'xdt99' | 'relaxed';
 
 export interface DialectInfo {
@@ -54,17 +56,23 @@ export const DIALECTS: Record<SyntaxDialect, DialectInfo> = {
  */
 export function detectDialect(text: string): DialectDetection {
     const lines = text.split(/\r?\n/);
-    let singleBlankComments = 0;
     let semicolonComments = 0;
     let code = 0;
 
     for (const line of lines) {
         if (!line.trim() || line[0] === '*' || line[0] === ';') continue;
         code++;
-        if (/;/.test(line)) semicolonComments++;
-        // operand followed by exactly one blank then a '*' comment
-        if (/\S\s\*(?!\S*')/.test(line) && !/^\s*\S+\s+\S*\*[Rr]/.test(line)) singleBlankComments++;
+        // A ';' only opens a comment if it survives the operand scan. Inside a
+        // TEXT literal or a filename it is data, not a comment.
+        if (splitLine(line, 'xdt99').comment.startsWith(';')) semicolonComments++;
     }
+
+    // Count hazards with the field parser instead of a regex over the raw line.
+    // A regex cannot tell an operand's indirect addressing ('MOVB *R1+') from a
+    // comment's leading '*', cannot see that a tab is a legal separator, and it
+    // reads characters inside ';' comments and quoted literals as code. Each of
+    // those produced a wrong count on a real source.
+    const singleBlankComments = findDialectHazards(text).length;
 
     if (singleBlankComments > 0) {
         return {

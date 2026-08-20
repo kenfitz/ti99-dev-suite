@@ -324,3 +324,61 @@ export function contextKeysFor(plan: ActionPlan): ContextKeys {
 }
 
 export { findTargetDefinition, targetsForLanguage };
+
+/**
+ * Rewrite the project references to a renamed source file.
+ *
+ * Renaming game.b99 to game.xb99 breaks entrySource, the sources list, any
+ * target that names it, basicSource and the per-source defaults, all of which
+ * are paths written by hand. Returning a new config rather than mutating lets
+ * the caller diff it and lets this be tested without a filesystem.
+ *
+ * Paths are compared by suffix, since ti99.json holds project-relative paths
+ * while the editor supplies absolute ones.
+ */
+export function renameSourceReferences(
+    config: ProjectConfig, from: string, to: string,
+): { config: ProjectConfig; changed: string[] } {
+    const norm = (p: string) => toPosix(p).toLowerCase();
+    const oldName = norm(from);
+    const newName = toPosix(to).split("/").pop() ?? to;
+    const changed: string[] = [];
+
+    const matches = (p: string) =>
+        norm(p) === oldName || oldName.endsWith("/" + norm(p)) || norm(p).endsWith("/" + oldName);
+
+    /** Keep the directory the project wrote, swap only the filename. */
+    const rewrite = (p: string, where: string): string => {
+        if (!matches(p)) { return p; }
+        const parts = toPosix(p).split("/");
+        parts[parts.length - 1] = newName;
+        const updated = parts.join("/");
+        changed.push(where + ": " + p + " -> " + updated);
+        return updated;
+    };
+
+    const next: ProjectConfig = { ...config };
+    next.sources = config.sources.map((p, i) => rewrite(p, "sources[" + i + "]"));
+    if (config.entrySource) { next.entrySource = rewrite(config.entrySource, "entrySource"); }
+    if (config.basicSource) { next.basicSource = rewrite(config.basicSource, "basicSource"); }
+
+    if (config.targets) {
+        next.targets = config.targets.map(t => {
+            const copy: TargetConfig = { ...t };
+            if (t.sources) { copy.sources = t.sources.map((p, i) => rewrite(p, t.id + ".sources[" + i + "]")); }
+            if (t.entrySource) { copy.entrySource = rewrite(t.entrySource, t.id + ".entrySource"); }
+            if (t.basicSource) { copy.basicSource = rewrite(t.basicSource, t.id + ".basicSource"); }
+            return copy;
+        });
+    }
+
+    if (config.sourceDefaults) {
+        const defaults: Record<string, string> = {};
+        for (const [key, value] of Object.entries(config.sourceDefaults)) {
+            defaults[rewrite(key, "sourceDefaults")] = value;
+        }
+        next.sourceDefaults = defaults;
+    }
+
+    return { config: next, changed };
+}

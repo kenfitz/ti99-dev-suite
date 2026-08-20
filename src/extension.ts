@@ -16,12 +16,13 @@ import type { SyntaxDialect } from './lang/dialect';
 import { ProjectManager } from './config/loader';
 import type { Project } from './config/loader';
 import type { Capability, Processor } from './config/project';
-import { resolveTarget, targetIds } from './config/project';
-import { ActionPlan, askDialect, contextFor, initRouting, offerCanonicalRename,
-    pickTargetFor, planFor, updateContextKeys } from './actions/routing';
+import { ProjectConfig, resolveTarget, targetIds } from './config/project';
+import { ActionPlan, artifactCurrent, askDialect, contextFor, initRouting,
+    offerCanonicalRename, offerRebuild, pickTargetFor, planFor,
+    updateContextKeys } from './actions/routing';
 import { LanguageId, labelOf } from './actions/languages';
 import { ActionKind, findTargetDefinition } from './actions/targets';
-import { defaultTargetFor } from './actions/resolver';
+import { defaultTargetFor, renameSourceReferences } from './actions/resolver';
 import { describeState, discover } from './toolchain/discovery';
 import type { ToolchainState } from './toolchain/discovery';
 import { Cancellation, run } from './toolchain/runner';
@@ -741,6 +742,27 @@ async function doRouted(
  * pipelines land in the next phase, so they say so plainly rather than
  * failing somewhere inside the toolchain.
  */
+
+/**
+ * Whether the artifacts of the last build are still newer than the sources.
+ *
+ * Compares each runnable artifact against every source the project lists. If
+ * any source has been touched since, the build is stale and Run must say so
+ * rather than launching it.
+ */
+function buildIsCurrent(build: BuildResult | undefined): boolean {
+    if (!build?.artifacts?.length) { return false; }
+    const project = projects?.active;
+    if (!project) { return true; }
+
+    const root = project.root.fsPath;
+    const sources = project.config.sources.map(p =>
+        path.isAbsolute(p) ? p : path.join(root, p));
+    return build.artifacts
+        .filter(a => a.runnable)
+        .every(a => artifactCurrent(a.path, sources));
+}
+
 async function runTargetAction(
     action: ActionKind, targetId: string, language: LanguageId,
 ): Promise<void> {
@@ -774,6 +796,12 @@ async function runTargetAction(
                 void vscode.window.showInformationMessage(
                     "Nothing has been built for " + definition.label + " yet. Use Build and Run.");
                 return;
+            }
+            // Running a stale artifact shows yesterday behaviour and blames
+            // today code, so offer the rebuild rather than launching quietly.
+            if (!buildIsCurrent(lastBuild)) {
+                if (!await offerRebuild(definition.label)) { return; }
+                if (!await doBuild({ rebuild: false, target: targetId })) { return; }
             }
             await doRun(lastBuild.artifacts);
             return;
@@ -865,7 +893,31 @@ async function doRenameToCanonical(uri?: vscode.Uri): Promise<void> {
         vscode.window.showInformationMessage("Resolve the dialect first.");
         return;
     }
-    await offerCanonicalRename(found.uri, language);
+    const renamed = await offerCanonicalRename(found.uri, language);
+    if (!renamed) { return; }
+
+    // The file moved, so every path in ti99.json that named it is now wrong.
+    const project = projects?.active;
+    if (!project) { return; }
+    const { config, changed } = renameSourceReferences(
+        project.config, found.uri.fsPath, renamed.fsPath);
+    if (changed.length === 0) { return; }
+
+    await writeProjectConfig(project.configUri, config);
+    void vscode.window.showInformationMessage(
+        "Updated " + changed.length + " reference" + (changed.length === 1 ? "" : "s") +
+        " in ti99.json.", "Show").then(answer => {
+            if (answer === "Show") {
+                output.appendLine(changed.join("\n"));
+                output.show();
+            }
+        });
+}
+
+/** Write a project config back, preserving the file the user has open. */
+async function writeProjectConfig(uri: vscode.Uri, config: ProjectConfig): Promise<void> {
+    const text = JSON.stringify(config, (key, value) => value === undefined ? undefined : value, 4);
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(text + "\n", "utf8"));
 }
 
 function registerCommands(context: vscode.ExtensionContext): void {

@@ -7,7 +7,7 @@ const test = require("node:test");
 const assert = require("node:assert");
 const {
     resolveSource, resolveFileLanguage, resolveTargets, resolveActions,
-    defaultTargetFor, artifactIsCurrent, contextKeysFor,
+    defaultTargetFor, artifactIsCurrent, contextKeysFor, renameSourceReferences,
 } = require("../out/actions/resolver.js");
 const { targetsForLanguage } = require("../out/actions/targets.js");
 
@@ -230,4 +230,57 @@ test("the Explorer menu and the Command Palette cannot diverge", () => {
     const menuTargets = resolveTargets("tms9900", "build-run", ctx()).map(c => c.target.id);
     const paletteTargets = resolveTargets("tms9900", "build-run", ctx()).map(c => c.target.id);
     assert.deepStrictEqual(menuTargets, paletteTargets);
+});
+
+test("renaming a source updates every project reference", () => {
+    const config = {
+        name: "Game",
+        sources: ["src/game.b99", "src/util.a99"],
+        entrySource: "src/game.b99",
+        basicSource: "src/game.b99",
+        sourceDefaults: { "src/game.b99": "xb-basic-disk" },
+        targets: [
+            { id: "disk", entrySource: "src/game.b99", sources: ["src/game.b99"] },
+            { id: "other", entrySource: "src/util.a99", sources: ["src/util.a99"] },
+        ],
+    };
+    const { config: next, changed } = renameSourceReferences(
+        config, "src/game.b99", "src/game.xb99");
+
+    assert.deepStrictEqual(next.sources, ["src/game.xb99", "src/util.a99"]);
+    assert.strictEqual(next.entrySource, "src/game.xb99");
+    assert.strictEqual(next.basicSource, "src/game.xb99");
+    assert.deepStrictEqual(next.targets[0].sources, ["src/game.xb99"]);
+    assert.strictEqual(next.targets[0].entrySource, "src/game.xb99");
+    assert.deepStrictEqual(next.sourceDefaults, { "src/game.xb99": "xb-basic-disk" });
+    assert.ok(changed.length >= 6, "every change is reported for review");
+});
+
+test("renaming leaves unrelated references alone", () => {
+    const config = {
+        name: "Game",
+        sources: ["src/game.b99", "src/util.a99"],
+        entrySource: "src/util.a99",
+        targets: [{ id: "t", entrySource: "src/util.a99", sources: ["src/util.a99"] }],
+    };
+    const { config: next, changed } = renameSourceReferences(
+        config, "src/game.b99", "src/game.xb99");
+    assert.strictEqual(next.entrySource, "src/util.a99");
+    assert.deepStrictEqual(next.targets[0].sources, ["src/util.a99"]);
+    assert.strictEqual(changed.length, 1, "only the sources entry changed");
+});
+
+test("renaming matches an absolute path against relative project paths", () => {
+    // ti99.json holds relative paths; the editor hands over an absolute one.
+    const config = { name: "G", sources: ["src/game.b99"], entrySource: "src/game.b99" };
+    const { config: next } = renameSourceReferences(
+        config, "C:/work/proj/src/game.b99", "C:/work/proj/src/game.xb99");
+    assert.strictEqual(next.entrySource, "src/game.xb99",
+        "the project keeps its relative form");
+});
+
+test("renaming does not mutate the config it was given", () => {
+    const config = { name: "G", sources: ["src/game.b99"], entrySource: "src/game.b99" };
+    renameSourceReferences(config, "src/game.b99", "src/game.xb99");
+    assert.strictEqual(config.entrySource, "src/game.b99", "caller keeps the original");
 });

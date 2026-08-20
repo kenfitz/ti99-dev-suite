@@ -147,3 +147,37 @@ test('project settings are read with a resource scope', () => {
   }
   assert.deepStrictEqual(offenders, [], 'unscoped configuration reads');
 });
+
+test('settings are declared at a scope that allows per-folder values', () => {
+  // VS Code's default scope is "window", and a window-scoped setting is
+  // ignored in a folder-level .vscode/settings.json - the settings editor
+  // greys it out. Reading it with a resource scope does not help, because the
+  // value was never applied. Anything a project may configure for itself must
+  // therefore be declared "resource" or "machine-overridable".
+  const PER_FOLDER = new Set(['resource', 'machine-overridable', 'language-overridable']);
+  const bad = [];
+  for (const section of pkg.contributes.configuration) {
+    for (const [key, prop] of Object.entries(section.properties || {})) {
+      if (!PER_FOLDER.has(prop.scope)) {
+        bad.push(key + ' has scope ' + JSON.stringify(prop.scope || '(default: window)'));
+      }
+    }
+  }
+  assert.deepStrictEqual(bad, [], 'settings that cannot be set per folder');
+});
+
+test('every setting a profile requires is settable per folder', () => {
+  const byKey = new Map();
+  for (const section of pkg.contributes.configuration) {
+    for (const [key, prop] of Object.entries(section.properties || {})) byKey.set(key, prop);
+  }
+  const PER_FOLDER = new Set(['resource', 'machine-overridable', 'language-overridable']);
+  for (const p of BUILTIN_EMULATORS) {
+    for (const key of p.requires || []) {
+      const prop = byKey.get(key);
+      assert.ok(prop, p.id + ' requires unknown setting ' + key);
+      assert.ok(PER_FOLDER.has(prop.scope),
+        p.id + ' requires ' + key + ', which cannot be set per folder (scope ' + prop.scope + ')');
+    }
+  }
+});

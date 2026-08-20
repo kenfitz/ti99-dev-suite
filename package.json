@@ -196,6 +196,7 @@
         "properties": {
           "ti99.syntaxDialect": {
             "type": "string",
+            "scope": "resource",
             "enum": [
               "ea",
               "xdt99",
@@ -211,6 +212,7 @@
           },
           "ti99.processor": {
             "type": "string",
+            "scope": "resource",
             "enum": [
               "9900",
               "9995",
@@ -227,41 +229,49 @@
         "properties": {
           "ti99.format.labelColumn": {
             "type": "number",
+            "scope": "resource",
             "default": 1,
             "description": "Column for the label field."
           },
           "ti99.format.opcodeColumn": {
             "type": "number",
+            "scope": "resource",
             "default": 8,
             "description": "Column for the instruction or directive field."
           },
           "ti99.format.operandColumn": {
             "type": "number",
+            "scope": "resource",
             "default": 13,
             "description": "Column for the operand field."
           },
           "ti99.format.commentColumn": {
             "type": "number",
+            "scope": "resource",
             "default": 31,
             "description": "Column for trailing comments."
           },
           "ti99.format.alignComments": {
             "type": "boolean",
+            "scope": "resource",
             "default": true,
             "description": "Align trailing comments to the comment column."
           },
           "ti99.format.uppercaseMnemonics": {
             "type": "boolean",
+            "scope": "resource",
             "default": true,
             "description": "Uppercase instruction and directive mnemonics."
           },
           "ti99.format.uppercaseRegisters": {
             "type": "boolean",
+            "scope": "resource",
             "default": true,
             "description": "Uppercase register names outside string literals."
           },
           "ti99.format.minCommentGap": {
             "type": "number",
+            "scope": "resource",
             "default": 2,
             "minimum": 2,
             "markdownDescription": "Minimum blanks between operand and trailing comment. **Cannot be lowered below 2**: a single blank turns a `*` comment into a multiplication operator under xas99 default syntax and silently changes the program."
@@ -273,26 +283,31 @@
         "properties": {
           "ti99.toolchain.profile": {
             "type": "string",
+            "scope": "resource",
             "default": "xdt99",
             "description": "Which registered tool profile builds this project."
           },
           "ti99.toolchain.pythonPath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Python 3.8+ interpreter. Empty to auto-detect."
           },
           "ti99.toolchain.xdt99Path": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Directory containing xas99.py and xdm99.py. Empty to auto-detect."
           },
           "ti99.toolchain.customPath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Executable for a custom assembler profile."
           },
           "ti99.toolchain.profiles": {
             "type": "array",
+            "scope": "resource",
             "default": [],
             "description": "Additional tool profiles declaring capabilities, detection rules and argument templates.",
             "items": {
@@ -306,36 +321,43 @@
         "properties": {
           "ti99.emulator.profile": {
             "type": "string",
+            "scope": "resource",
             "default": "",
             "description": "Emulator profile used by Run and Build and Run."
           },
           "ti99.emulator.classic99Path": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Path to Classic99.exe. Launched as: classic99.exe -rom <file>"
           },
           "ti99.emulator.classic99Dsk1": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Classic99 DSK1 folder. Disk builds drop TIFILES output here, since Classic99 cannot write to .dsk images."
           },
           "ti99.emulator.classic99EaRom": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Editor/Assembler cartridge for Classic99, passed as -rom. Classic99 reads the ROM type from the last letter of the filename (C = CPU ROM, D = second bank, G = GROM). Not distributed with the extension."
           },
           "ti99.emulator.classic99XbRom": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Extended BASIC cartridge for Classic99, passed as -rom. Needed for a boot disk, since Extended BASIC is what runs the LOAD program. Not distributed with the extension."
           },
           "ti99.emulator.mamePath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Path to the MAME executable."
           },
           "ti99.emulator.mameSystem": {
             "type": "string",
+            "scope": "resource",
             "default": "ti99_4a",
             "enum": [
               "ti99_4",
@@ -347,21 +369,25 @@
           },
           "ti99.emulator.eaCartridgePath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Your own Editor/Assembler cartridge image for disk projects under MAME. Never downloaded for you."
           },
           "ti99.emulator.win994aPath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Path to Win994a.exe. Launch only; no documented command line for loading a program."
           },
           "ti99.emulator.customPath": {
             "type": "string",
+            "scope": "machine-overridable",
             "default": "",
             "description": "Executable for a custom emulator profile."
           },
           "ti99.emulator.customArgs": {
             "type": "array",
+            "scope": "resource",
             "default": [],
             "items": {
               "type": "string"
@@ -375,6 +401,7 @@
         "properties": {
           "ti99.diagnostics.unresolvedReferencePolicy": {
             "type": "string",
+            "scope": "resource",
             "enum": [
               "ignore",
               "information",
@@ -386,6 +413,7 @@
           },
           "ti99.diagnostics.staticAnalysis": {
             "type": "boolean",
+            "scope": "resource",
             "default": true,
             "description": "Fast checks as you type: unknown mnemonics, operand counts, duplicate labels, jump range, dialect hazards."
           }

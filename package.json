@@ -2,7 +2,7 @@
   "name": "ti99-dev-suite",
   "displayName": "TI-99/4A Development Suite",
   "description": "TMS9900 assembly language support, build, packaging and emulator launch for the TI-99/4A.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "kenfitz",
   "license": "MIT",
   "engines": {

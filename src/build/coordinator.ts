@@ -561,7 +561,14 @@ export class BuildCoordinator {
             displayName: path.basename(filePath),
             size,
             createdAt,
-            runnable: ['cart-rpk', 'cart-bin', 'ea5-image', 'ea3-object', 'disk-image'].includes(kind),
+            // A tokenised BASIC program is as runnable as a cartridge is: it
+            // is the thing the emulator loads. Leaving it out made a BASIC
+            // build produce nothing the launcher considered the primary
+            // artifact, which broke ${tiFilename} and the staleness check.
+            runnable: [
+                'cart-rpk', 'cart-bin', 'ea5-image', 'ea3-object', 'disk-image',
+                'basic-program', 'xb-program',
+            ].includes(kind),
         };
     }
 

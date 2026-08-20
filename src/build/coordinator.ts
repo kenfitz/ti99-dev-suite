@@ -261,6 +261,7 @@ export class BuildCoordinator {
             case 'cart-bin': return path.join(dist, config.cartridge?.binFilename ?? `${tiStem.slice(0, 9)}C.BIN`);
             case 'ea5-image': return path.join(dist, tiStem);
             case 'ea3-object': return path.join(dist, `${tiStem.slice(0, 9)}O`);
+            case 'ea3-tifiles': return path.join(dist, `${tiStem.slice(0, 9)}O.tfi`);
             case 'disk-image': return path.join(dist, `${stem}.dsk`);
             // Extended BASIC runs a program called LOAD from DSK1 at power-up,
             // so that is the default name a boot disk wants.
@@ -306,6 +307,8 @@ export class BuildCoordinator {
                 ? (config.basicSource ? path.resolve(root, config.basicSource) : '')
                 : capability === 'basic-tifiles'
                     ? this.outputPathFor(project, 'basic-program')
+                : capability === 'ea3-tifiles'
+                    ? this.outputPathFor(project, 'ea3-object')
                     : wrapped ? this.outputPathFor(project, wrapped) : '';
 
         const variables = toolchain.tool!.profile.variables ?? {};

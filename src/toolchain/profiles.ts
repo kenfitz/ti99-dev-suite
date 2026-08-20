@@ -63,6 +63,7 @@ export const XDT99_PROFILE: ToolProfile = {
         'assemble', 'link', 'listing', 'symbols',
         'cart-rpk', 'cart-bin', 'ea3-object', 'ea5-image',
         'disk-image', 'tifiles', 'basic-program', 'basic-tifiles', 'xb-program',
+        'ea3-tifiles',
     ],
     detect: {
         files: ['xas99.py'],
@@ -142,6 +143,17 @@ export const XDT99_PROFILE: ToolProfile = {
             ],
             cwd: '${projectRoot}',
             problemMatcher: 'xas99',
+            successRequiresArtifact: '${output}',
+        },
+        // Wrap the tagged object for a FIAD directory, so Editor/Assembler
+        // option 3 can load it. The generic tifiles step wraps the memory
+        // image when a target builds one, which leaves option 3 with nothing
+        // to load even though the object was assembled.
+        'ea3-tifiles': {
+            program: '${python}',
+            args: ['${tool}/xdm99.py', '-T', '${input}', '-f', 'DIS/FIX 80', '-o', '${output}'],
+            cwd: '${projectRoot}',
+            problemMatcher: 'xdm99',
             successRequiresArtifact: '${output}',
         },
         // Embed the assembled code inside an Extended BASIC program, so it runs

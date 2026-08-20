@@ -109,13 +109,18 @@ export const CLASSIC99_EA: EmulatorProfile = {
     preLaunch: [
         { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
         { action: 'copy', from: '${artifact:tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${tiFilename}' },
+        // Option 3 loads the tagged object, which is a different file from the
+        // option 5 memory image, so it needs its own name on the disk.
+        { action: 'copy', from: '${artifact:ea3-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${tiFilename}O' },
     ],
     singleInstance: true,
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99EaRom', 'ti99.emulator.classic99Dsk1'],
-    hint: 'Editor/Assembler loaded. Press any key, choose 2 for EDITOR/ASSEMBLER, ' +
-        'then 5 (RUN PROGRAM FILE) and enter DSK1.${tiFilename} - it starts by itself.',
+    hint: 'Editor/Assembler loaded. Press a key, then 2 for EDITOR/ASSEMBLER. ' +
+        'Option 5 (RUN PROGRAM FILE): enter DSK1.${tiFilename} and it starts ' +
+        'by itself. Option 3 (LOAD AND RUN): enter DSK1.${tiFilename}O, press ' +
+        'Enter on the blank line, then type MAIN.',
     notes: 'Loads the Editor/Assembler cartridge and drops the build into DSK1. ' +
         'Choose option 5 for a memory image or option 3 for a tagged object, then ' +
         'the program name from DEF. Cartridge ROMs are not distributed with the ' +
@@ -187,7 +192,9 @@ export const CLASSIC99_XB_DISK: EmulatorProfile = {
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom'],
     hint: 'Extended BASIC loaded. Insert the disk: Disk > DSK1 > open ' +
-        '${artifact:disk-image} — then type  RUN "DSK1.LOAD"',
+        '${artifact:disk-image} — then type  RUN "DSK1.LOAD"  and wait. The ' +
+        'whole game travels inside the BASIC program, so loading takes about ' +
+        'a minute before the title screen appears.',
     notes: 'The game is embedded in the Extended BASIC program, so the Editor/' +
         'Assembler cartridge is not required. Cartridge ROMs are not distributed ' +
         'with the extension.',

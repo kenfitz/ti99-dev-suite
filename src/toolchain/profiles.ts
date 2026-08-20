@@ -62,7 +62,7 @@ export const XDT99_PROFILE: ToolProfile = {
     capabilities: [
         'assemble', 'link', 'listing', 'symbols',
         'cart-rpk', 'cart-bin', 'ea3-object', 'ea5-image',
-        'disk-image', 'tifiles', 'basic-program', 'basic-tifiles',
+        'disk-image', 'tifiles', 'basic-program', 'basic-tifiles', 'xb-program',
     ],
     detect: {
         files: ['xas99.py'],
@@ -139,6 +139,21 @@ export const XDT99_PROFILE: ToolProfile = {
                 '-o', '${output}',
                 '-I', '${includePaths}', ';',
                 '--color', 'off',
+            ],
+            cwd: '${projectRoot}',
+            problemMatcher: 'xas99',
+            successRequiresArtifact: '${output}',
+        },
+        // Embed the assembled code inside an Extended BASIC program, so it runs
+        // without the Editor/Assembler module. Requires relocatable code and
+        // enters at offset 0, which is why these targets start with a branch.
+        'xb-program': {
+            program: '${python}',
+            args: [
+                '${tool}/xas99.py', '--embed-xb', '${dialectFlag}', '${registerFlag}', '${cpuFlag}',
+                '${sources}', '-o', '${output}',
+                '-L', '${listing}', '-S', '-E', '${symbolFile}',
+                '-I', '${includePaths}', ';', '--color', 'off',
             ],
             cwd: '${projectRoot}',
             problemMatcher: 'xas99',

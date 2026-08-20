@@ -266,6 +266,8 @@ export class BuildCoordinator {
             // so that is the default name a boot disk wants.
             case 'basic-program': return path.join(build, config.basicName ?? 'LOAD');
             case 'basic-tifiles': return path.join(dist, config.basicName ?? 'LOAD');
+            // Extended BASIC runs a program called LOAD from DSK1 at power-up.
+            case 'xb-program': return path.join(dist, config.basicName ?? 'LOAD');
             case 'tifiles': return path.join(dist, `${tiStem}.tfi`);
             default: return path.join(build, `${stem}.${capability}`);
         }

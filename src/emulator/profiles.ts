@@ -170,6 +170,29 @@ export const CLASSIC99_EA_DISK: EmulatorProfile = {
         'not distributed with the extension.',
 };
 
+/**
+ * An Extended BASIC distribution disk: the whole game travels inside an XB
+ * program, so no Editor/Assembler is needed. Nothing is staged, because the
+ * .dsk is the deliverable and Classic99 has no command line for mounting one.
+ */
+export const CLASSIC99_XB_DISK: EmulatorProfile = {
+    id: 'classic99-xbdisk',
+    displayName: 'Classic99 — Extended BASIC cartridge + disk image',
+    kind: 'process',
+    accepts: ['xb-program', 'disk-image'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom'],
+    hint: 'Extended BASIC loaded. Insert the disk: Disk > DSK1 > open ' +
+        '${artifact:disk-image} — then type  RUN "DSK1.LOAD"',
+    notes: 'The game is embedded in the Extended BASIC program, so the Editor/' +
+        'Assembler cartridge is not required. Cartridge ROMs are not distributed ' +
+        'with the extension.',
+};
+
 export const MAME_CART: EmulatorProfile = {
     id: 'mame-cart',
     displayName: 'MAME — cartridge (RPK)',
@@ -244,7 +267,7 @@ export const CUSTOM_EMULATOR: EmulatorProfile = {
 };
 
 export const BUILTIN_EMULATORS: EmulatorProfile[] = [
-    CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_EA_DISK, CLASSIC99_XB, CLASSIC99_DISK,
+    CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_EA_DISK, CLASSIC99_XB_DISK, CLASSIC99_XB, CLASSIC99_DISK,
     MAME_CART, MAME_DISK,
     JS99ER, WIN994A, CUSTOM_EMULATOR,
 ];

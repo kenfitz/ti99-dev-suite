@@ -21,7 +21,7 @@ import { ActionPlan, artifactCurrent, askDialect, contextFor, initRouting,
     offerCanonicalRename, offerRebuild, pickTargetFor, planFor,
     updateContextKeys } from './actions/routing';
 import { LanguageId, labelOf } from './actions/languages';
-import { ActionKind, findTargetDefinition } from './actions/targets';
+import { ActionKind, allTargets, findTargetDefinition } from './actions/targets';
 import { defaultTargetFor, renameSourceReferences } from './actions/resolver';
 import { validate as validateBasic } from './lang/basic/validator';
 import { registerBasicProviders } from './lang/basic/providers';
@@ -940,6 +940,52 @@ async function validateBasicDocument(uri: vscode.Uri, language: LanguageId): Pro
     return errors;
 }
 
+/**
+ * Build and run one named target, with no picker.
+ *
+ * These back the per-target entries in the context menu. They exist so the
+ * common case is one click on a menu item that says what it will do, rather
+ * than a generic command followed by a list. The commands are generated from
+ * the same target table the picker reads, so a target cannot appear in one and
+ * not the other.
+ */
+async function doBuildAndRunTarget(targetId: string, uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+
+    const definition = findTargetDefinition(targetId);
+    if (!definition) {
+        void vscode.window.showErrorMessage("Unknown target '" + targetId + "'.");
+        return;
+    }
+
+    const language = await withLanguage(found.uri, found.plan);
+    if (!language) { return; }
+
+    if (!definition.languageIds.includes(language)) {
+        void vscode.window.showWarningMessage(
+            definition.label + " cannot be built from " + labelOf(language) + " source.");
+        return;
+    }
+
+    // Say up front which setting is missing, rather than failing inside the
+    // toolchain later.
+    const missing = (definition.requires ?? []).filter(key => {
+        const dot = key.lastIndexOf(".");
+        const value = vscode.workspace.getConfiguration(key.slice(0, dot)).get<string>(key.slice(dot + 1));
+        return typeof value !== "string" || value.trim().length === 0;
+    });
+    if (missing.length) {
+        const fix = "Configure";
+        const answer = await vscode.window.showWarningMessage(
+            definition.label + " needs " + missing.join(" and ") + ".", fix);
+        if (answer === fix) { await doConfigureToolchain(); }
+        return;
+    }
+
+    await runTargetAction("build-run", targetId, language);
+}
+
 async function doCreateProjectFromFile(context: vscode.ExtensionContext, uri?: vscode.Uri): Promise<void> {
     const found = await planForUri(uri);
     if (!found) { return; }
@@ -1024,6 +1070,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
     register('ti99.selectContainingTarget', (uri?: vscode.Uri) => doSelectContainingTarget(uri));
     register('ti99.createProjectFromFile', (uri?: vscode.Uri) => doCreateProjectFromFile(context, uri));
     register('ti99.renameToCanonical', (uri?: vscode.Uri) => doRenameToCanonical(uri));
+
+    // One command per target, generated from the same table the menu reads.
+    for (const target of allTargets()) {
+        if (!target.menuLabel || !target.actionKinds.includes('build-run')) { continue; }
+        register('ti99.buildAndRun.' + target.id,
+            (uri?: vscode.Uri) => doBuildAndRunTarget(target.id, uri));
+    }
 }
 
 function stem(project: Project): string {

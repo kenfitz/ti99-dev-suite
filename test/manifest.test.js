@@ -18,7 +18,22 @@ const settingIds = new Set(
 const contributed = new Set(pkg.contributes.commands.map(c => c.command));
 const source = fs.readFileSync(path.join(root, 'src', 'extension.ts'), 'utf8');
 const registered = new Set(
-  [...source.matchAll(/register\('([^']+)'/g)].map(m => m[1]));
+  [...source.matchAll(/register\('([^']+)'/g)].map(m => m[1])
+    // The loop registers 'ti99.buildAndRun.' + target.id, so the scan sees the
+    // prefix on its own. That is a fragment, not a command.
+    .filter(id => !id.endsWith('.')));
+
+// The per-target commands are registered in a loop from the target table
+// rather than written out one by one, so a scan for literal strings cannot see
+// them. Add what that loop will produce, and let the drift guards below check
+// the table against the manifest directly.
+if (/register\('ti99\.buildAndRun\.' \+ target\.id/.test(source)) {
+  for (const target of require("../out/actions/targets.js").allTargets()) {
+    if (target.menuLabel && target.actionKinds.includes('build-run')) {
+      registered.add('ti99.buildAndRun.' + target.id);
+    }
+  }
+}
 
 test('every registered command is contributed in package.json', () => {
   const missing = [...registered].filter(c => !contributed.has(c));
@@ -283,4 +298,86 @@ test("no user-facing text still promises a memory map", () => {
         /Show Memory Map/.test(l) && !/alias|never produced/.test(l));
     assert.deepStrictEqual(offending, [],
         "requirement 29.2 is not implemented, so nothing may advertise it");
+});
+
+// Per-target context-menu entries.
+//
+// The point of these is that the menu says what it will do before you click,
+// instead of a generic command followed by a list. They are generated from the
+// target table, and these guards are what stop the two drifting apart.
+
+const runnableTargets = () =>
+  require("../out/actions/targets.js").allTargets()
+    .filter(t => t.menuLabel && t.actionKinds.includes("build-run"));
+
+test("every runnable target has its own command", () => {
+  const ids = new Set(pkg.contributes.commands.map(c => c.command));
+  for (const target of runnableTargets()) {
+    assert.ok(ids.has("ti99.buildAndRun." + target.id),
+      target.id + " has no command, so it cannot appear in the menu");
+  }
+});
+
+test("command titles come from the target table", () => {
+  const byId = Object.fromEntries(pkg.contributes.commands.map(c => [c.command, c]));
+  for (const target of runnableTargets()) {
+    assert.strictEqual(byId["ti99.buildAndRun." + target.id].title, target.menuLabel,
+      target.id + " title must match its menuLabel, or the two will drift");
+  }
+});
+
+test("no command exists for a target that is gone", () => {
+  const known = new Set(runnableTargets().map(t => "ti99.buildAndRun." + t.id));
+  const orphans = pkg.contributes.commands
+    .map(c => c.command)
+    .filter(id => id.startsWith("ti99.buildAndRun.") && !known.has(id));
+  assert.deepStrictEqual(orphans, [], "these commands name targets that no longer exist");
+});
+
+test("each target entry is gated to the languages it accepts", () => {
+  const entries = Object.fromEntries(
+    pkg.contributes.menus["ti99.explorer"]
+      .filter(e => (e.command || "").startsWith("ti99.buildAndRun."))
+      .map(e => [e.command, e]));
+  for (const target of runnableTargets()) {
+    const entry = entries["ti99.buildAndRun." + target.id];
+    assert.ok(entry, target.id + " is not in the submenu");
+    for (const language of target.languageIds) {
+      assert.ok(entry.when.includes("'" + language + "'"),
+        target.id + " must be offered for " + language);
+    }
+    assert.ok(entry.when.includes("ti99.isEntrySource"),
+      target.id + " must not be offered on a module that is not a program");
+  }
+});
+
+test("assembly targets are never offered on BASIC files, or the reverse", () => {
+  const entries = pkg.contributes.menus["ti99.explorer"]
+    .filter(e => (e.command || "").startsWith("ti99.buildAndRun."));
+  const find = id => entries.find(e => e.command === "ti99.buildAndRun." + id).when;
+
+  assert.ok(!find("cart").includes("ti-basic"), "a cartridge cannot be built from BASIC");
+  assert.ok(!find("basic-program").includes("tms9900"), "TI BASIC cannot be built from assembly");
+  assert.ok(!find("xb-basic-program").includes("'ti-basic'"),
+    "an Extended BASIC program is not offered for TI BASIC source");
+});
+
+test("the Extended BASIC program is staged so it both auto-runs and can be listed", () => {
+  // Extended BASIC runs a standard-format program called LOAD at power-up.
+  // Staging only under that name would leave no way to load it without
+  // running it, so it goes down twice.
+  const { BUILTIN_EMULATORS } = require("../out/emulator/profiles.js");
+  const profile = BUILTIN_EMULATORS.find(p => p.id === "classic99-xb-program");
+  const copies = profile.preLaunch.filter(s => s.action === "copy").map(s => s.to);
+  assert.ok(copies.some(t => t.endsWith("/LOAD")), "one copy must be named LOAD to auto-run");
+  assert.ok(copies.some(t => t.includes("${basicName}")),
+    "and one under its own name, so it can be loaded without running");
+});
+
+test("the TI BASIC profile does not claim an auto-run it cannot do", () => {
+  const { BUILTIN_EMULATORS } = require("../out/emulator/profiles.js");
+  const profile = BUILTIN_EMULATORS.find(p => p.id === "classic99-basic");
+  assert.ok(!profile.preLaunch.some(s => (s.to || "").endsWith("/LOAD")),
+    "TI BASIC has no LOAD mechanism; staging one would imply it does");
+  assert.match(profile.hint, /OLD DSK1/, "the hint must give the exact command");
 });

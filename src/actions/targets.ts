@@ -15,6 +15,12 @@ export type ActionKind = "build" | "run" | "build-run" | "package" | "validate";
 export interface TargetDefinition {
     id: string;
     label: string;
+    /**
+     * Wording for a direct context-menu entry, which reads as a whole
+     * sentence rather than a list item: "Build and Run as Cartridge" instead
+     * of "Cartridge". Omitted when the target should not get its own entry.
+     */
+    menuLabel?: string;
     /** Shown under the label in the picker. Says what the user gets. */
     description: string;
     languageIds: LanguageId[];
@@ -42,6 +48,7 @@ export const TARGETS: TargetDefinition[] = [
     {
         id: "cart",
         label: "Cartridge",
+        menuLabel: "Build and Run as Cartridge",
         description: "Build a cartridge image and launch it. Needs no disk or expansion.",
         languageIds: ["tms9900"],
         actionKinds: ["build", "run", "build-run", "package", "validate"],
@@ -52,6 +59,7 @@ export const TARGETS: TargetDefinition[] = [
     {
         id: "ea3",
         label: "E/A Option 3",
+        menuLabel: "Build and Run with Editor/Assembler Cartridge",
         description: "Build object code for Editor/Assembler LOAD AND RUN.",
         languageIds: ["tms9900"],
         actionKinds: ["build", "run", "build-run", "package", "validate"],
@@ -62,6 +70,7 @@ export const TARGETS: TargetDefinition[] = [
     {
         id: "ea5",
         label: "E/A Option 5",
+        menuLabel: "Build and Run as E/A Option 5 Program",
         description: "Build a memory-image program for RUN PROGRAM FILE.",
         languageIds: ["tms9900"],
         actionKinds: ["build", "run", "build-run", "package", "validate"],
@@ -72,6 +81,7 @@ export const TARGETS: TargetDefinition[] = [
     {
         id: "ea-disk",
         label: "E/A Disk",
+        menuLabel: "Build and Run as Distribution Disk",
         description: "Build a disk image holding the program, for Editor/Assembler.",
         languageIds: ["tms9900"],
         actionKinds: ["build", "run", "build-run", "package", "validate"],
@@ -82,6 +92,7 @@ export const TARGETS: TargetDefinition[] = [
     {
         id: "xb-loader",
         label: "Extended BASIC Loader",
+        menuLabel: "Build and Run as Extended BASIC Disk",
         description: "Build a disk that starts from Extended BASIC, for people with 32K but no Editor/Assembler cartridge.",
         languageIds: ["tms9900"],
         actionKinds: ["build", "run", "build-run", "package", "validate"],
@@ -102,6 +113,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "basic-program",
         label: "TI BASIC",
+        menuLabel: "Build and Run in TI BASIC",
         description: "Tokenize to a native TI BASIC program and run it in TI BASIC.",
         languageIds: ["ti-basic"],
         actionKinds: ["build", "run", "build-run", "validate"],
@@ -112,6 +124,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "basic-disk",
         label: "TI BASIC Disk",
+        menuLabel: "Build and Run from a TI BASIC Disk",
         description: "Build a disk holding the tokenized TI BASIC program.",
         languageIds: ["ti-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],
@@ -122,6 +135,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "basic-under-xb",
         label: "Extended BASIC",
+        menuLabel: "Build and Run under Extended BASIC",
         description: "Run this TI BASIC program under Extended BASIC instead. An alternate runtime; the source stays TI BASIC.",
         languageIds: ["ti-basic"],
         actionKinds: ["run", "build-run"],
@@ -132,6 +146,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "xb-basic-program",
         label: "Extended BASIC",
+        menuLabel: "Build and Run in Extended BASIC",
         description: "Tokenize to a native Extended BASIC program and run it.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "run", "build-run", "validate"],
@@ -142,6 +157,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "xb-basic-disk",
         label: "Extended BASIC Disk",
+        menuLabel: "Build and Run from an Extended BASIC Disk",
         description: "Build a disk holding the tokenized Extended BASIC program.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],
@@ -152,6 +168,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
     {
         id: "xb-autorun-disk",
         label: "Extended BASIC Auto-Run Disk",
+        menuLabel: "Build and Run as Extended BASIC Auto-Run Disk",
         description: "Build a disk whose program is named LOAD, so Extended BASIC starts it by itself at power-up.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],

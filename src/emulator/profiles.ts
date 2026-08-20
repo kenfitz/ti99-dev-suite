@@ -237,8 +237,9 @@ export const CLASSIC99_BASIC: EmulatorProfile = {
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99Dsk1'],
-    hint: 'Choose TI BASIC from the console menu, then type  OLD DSK1.${basicName}  ' +
-        'and  RUN. TI BASIC has no auto-run, so those two steps are yours.',
+    hint: 'Choose TI BASIC from the console menu, then  OLD DSK1.${basicName}  ' +
+        'and  RUN. TI BASIC has no auto-run of any kind, so those two lines ' +
+        'cannot be automated away; they are what the machine requires.',
     notes: 'TI BASIC lives in the console ROM, so no cartridge file is needed. ' +
         'The tokenised program is dropped into DSK1 under its TI name.',
 };
@@ -260,16 +261,25 @@ export const CLASSIC99_XB_PROGRAM: EmulatorProfile = {
     args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
     preLaunch: [
         { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        // Twice, on purpose. Extended BASIC runs a standard-format program
+        // called LOAD at power-up, so that copy is what makes it start by
+        // itself. The copy under its own name is so the program can still be
+        // reached deliberately, with OLD DSK1.NAME, when you want to LIST or
+        // edit it instead of watching it run.
+        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/LOAD' },
         { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
     ],
     singleInstance: true,
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
-    hint: 'Extended BASIC loaded. A standard-format program named LOAD starts by ' +
-        'itself; anything else needs  RUN "DSK1.${basicName}".',
-    notes: 'Drops the tokenised Extended BASIC program into DSK1. Naming it LOAD ' +
-        'and keeping it in standard format is what makes it auto-run.',
+    hint: 'Extended BASIC starts the program by itself. Press FCTN+4 to break ' +
+        'into it, then LIST or RUN. It is also on the disk as ${basicName}, so ' +
+        'OLD DSK1.${basicName} loads it without running it.',
+    notes: 'Drops the tokenised program into DSK1 twice: as LOAD, which Extended ' +
+        'BASIC runs at power-up, and under its own name for loading by hand. ' +
+        'Whichever project was built last owns DSK1.LOAD, exactly as one real ' +
+        'disk would.',
 };
 
 export const MAME_CART: EmulatorProfile = {

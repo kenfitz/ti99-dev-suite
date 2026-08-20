@@ -252,6 +252,61 @@
         "command": "ti99.renameToCanonical",
         "title": "Rename to Canonical Extension...",
         "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.cart",
+        "title": "Build and Run as Cartridge",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.ea3",
+        "title": "Build and Run with Editor/Assembler Cartridge",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.ea5",
+        "title": "Build and Run as E/A Option 5 Program",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.ea-disk",
+        "title": "Build and Run as Distribution Disk",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.xb-loader",
+        "title": "Build and Run as Extended BASIC Disk",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.basic-program",
+        "title": "Build and Run in TI BASIC",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.basic-disk",
+        "title": "Build and Run from a TI BASIC Disk",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.basic-under-xb",
+        "title": "Build and Run under Extended BASIC",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.xb-basic-program",
+        "title": "Build and Run in Extended BASIC",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.xb-basic-disk",
+        "title": "Build and Run from an Extended BASIC Disk",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRun.xb-autorun-disk",
+        "title": "Build and Run as Extended BASIC Auto-Run Disk",
+        "category": "TI-99"
       }
     ],
     "menus": {
@@ -290,27 +345,27 @@
         {
           "command": "ti99.build",
           "when": "ti99.canBuild && ti99.isEntrySource",
-          "group": "2_build@1"
+          "group": "3_generic@1"
         },
         {
           "command": "ti99.buildAndRun",
           "when": "ti99.canRun && ti99.isEntrySource",
-          "group": "2_build@2"
+          "group": "3_generic@2"
         },
         {
           "command": "ti99.buildAndRunAs",
           "when": "ti99.canRun && ti99.isEntrySource",
-          "group": "2_build@3"
+          "group": "3_generic@3"
         },
         {
           "command": "ti99.run",
           "when": "ti99.canRun && ti99.isEntrySource",
-          "group": "3_run@1"
+          "group": "4_other@1"
         },
         {
           "command": "ti99.package",
           "when": "ti99.canPackage && ti99.isEntrySource",
-          "group": "3_run@2"
+          "group": "4_other@2"
         },
         {
           "command": "ti99.selectDialect",
@@ -320,22 +375,77 @@
         {
           "command": "ti99.buildContainingTarget",
           "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
-          "group": "2_build@1"
+          "group": "3_generic@1"
         },
         {
           "command": "ti99.buildAndRunContainingTarget",
           "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
-          "group": "2_build@2"
+          "group": "3_generic@2"
         },
         {
           "command": "ti99.selectContainingTarget",
           "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
-          "group": "2_build@3"
+          "group": "3_generic@3"
         },
         {
           "command": "ti99.showDiskCatalog",
           "when": "resourceExtname == .dsk",
           "group": "4_disk@1"
+        },
+        {
+          "command": "ti99.buildAndRun.cart",
+          "when": "ti99.isEntrySource && (ti99.language == 'tms9900')",
+          "group": "2_run@1"
+        },
+        {
+          "command": "ti99.buildAndRun.ea3",
+          "when": "ti99.isEntrySource && (ti99.language == 'tms9900')",
+          "group": "2_run@2"
+        },
+        {
+          "command": "ti99.buildAndRun.ea5",
+          "when": "ti99.isEntrySource && (ti99.language == 'tms9900')",
+          "group": "2_run@3"
+        },
+        {
+          "command": "ti99.buildAndRun.ea-disk",
+          "when": "ti99.isEntrySource && (ti99.language == 'tms9900')",
+          "group": "2_run@4"
+        },
+        {
+          "command": "ti99.buildAndRun.xb-loader",
+          "when": "ti99.isEntrySource && (ti99.language == 'tms9900')",
+          "group": "2_run@5"
+        },
+        {
+          "command": "ti99.buildAndRun.basic-program",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-basic')",
+          "group": "2_run@6"
+        },
+        {
+          "command": "ti99.buildAndRun.basic-disk",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-basic')",
+          "group": "2_run@7"
+        },
+        {
+          "command": "ti99.buildAndRun.basic-under-xb",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-basic')",
+          "group": "2_run@8"
+        },
+        {
+          "command": "ti99.buildAndRun.xb-basic-program",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-extended-basic')",
+          "group": "2_run@9"
+        },
+        {
+          "command": "ti99.buildAndRun.xb-basic-disk",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-extended-basic')",
+          "group": "2_run@10"
+        },
+        {
+          "command": "ti99.buildAndRun.xb-autorun-disk",
+          "when": "ti99.isEntrySource && (ti99.language == 'ti-extended-basic')",
+          "group": "2_run@11"
         }
       ],
       "commandPalette": [

@@ -959,6 +959,14 @@ async function doBuildAndRunTarget(targetId: string, uri?: vscode.Uri): Promise<
         return;
     }
 
+    // The Explorer cannot gate on entry-versus-module, because that is not a
+    // resource property VS Code can evaluate. So a module may reach here, and
+    // it is handled rather than built as though it were a program.
+    if (found.plan.source.role === "module") {
+        await doContainingTarget(true, found.uri, found.plan);
+        return;
+    }
+
     const language = await withLanguage(found.uri, found.plan);
     if (!language) { return; }
 

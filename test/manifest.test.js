@@ -343,12 +343,29 @@ test("each target entry is gated to the languages it accepts", () => {
     const entry = entries["ti99.buildAndRun." + target.id];
     assert.ok(entry, target.id + " is not in the submenu");
     for (const language of target.languageIds) {
-      assert.ok(entry.when.includes("'" + language + "'"),
+      assert.ok(entry.when.includes("resourceLangId == '" + language + "'"),
         target.id + " must be offered for " + language);
     }
-    assert.ok(entry.when.includes("ti99.isEntrySource"),
-      target.id + " must not be offered on a module that is not a program");
   }
+});
+
+test("menus never depend on editor-derived context keys", () => {
+  // This is the bug that made the whole submenu invisible. A custom context
+  // key describes the active editor, not the file that was right-clicked, so
+  // in the Explorer it is either empty or about a different file. Only
+  // resource context keys are evaluated against the clicked item.
+  const surfaces = ["explorer/context", "editor/context", "ti99.explorer"];
+  const offenders = [];
+  for (const surface of surfaces) {
+    for (const entry of pkg.contributes.menus[surface] || []) {
+      if (/ti99\.(language|isEntrySource|hasContainingTarget|canBuild|canRun|canPackage)/
+          .test(entry.when || "")) {
+        offenders.push(surface + ": " + (entry.command || entry.submenu));
+      }
+    }
+  }
+  assert.deepStrictEqual(offenders, [],
+    "these entries would be hidden or wrong when right-clicking in the Explorer");
 });
 
 test("assembly targets are never offered on BASIC files, or the reverse", () => {
@@ -358,7 +375,7 @@ test("assembly targets are never offered on BASIC files, or the reverse", () => 
 
   assert.ok(!find("cart").includes("ti-basic"), "a cartridge cannot be built from BASIC");
   assert.ok(!find("basic-program").includes("tms9900"), "TI BASIC cannot be built from assembly");
-  assert.ok(!find("xb-basic-program").includes("'ti-basic'"),
+  assert.ok(!/== 'ti-basic'/.test(find("xb-basic-program")),
     "an Extended BASIC program is not offered for TI BASIC source");
 });
 

@@ -56,12 +56,12 @@ The product should feel closer to Visual Studio for a modern platform than to a 
 Verified by execution on 2026-08-20:
 
 ```
-158 tests passing
+220 tests passing
   0 tests failing
   0 tests skipped
 Lint clean
 Types clean
-VSIX packages cleanly, no test fixtures included
+VSIX packages at 70 files, no test fixtures included
 ```
 
 Test composition, corrected against the previous record of 45/48/40:
@@ -69,14 +69,11 @@ Test composition, corrected against the previous record of 45/48/40:
 | Group | Count | Files |
 |---|---|---|
 | Assembly and packaging | 56 | `dialect` 10, `project` 12, `manifest` 25, `template` 9 |
-| BASIC language | 31 | `basic-lexer` 21, `basic-metadata` 10 |
+| BASIC language | 73 | `basic-lexer` 21, `basic-metadata` 10, `basic-parser` 42 |
+| BASIC build and schema | 20 | `basic-build` 20 |
 | Routing and actions | 57 | `actions-evidence` 13, `actions-language` 16, `actions-resolver` 28 |
 | Toolchain compatibility | 14 | `embedxb` 14 |
-| **Total** | **158** | |
-
-The assembly group grew from 45 to 56 because the manifest guards now also
-cover grammar contribution and the Show Symbols rename. The 14 new toolchain
-tests cover the embed-xb compatibility decision.
+| **Total** | **220** | |
 
 ## Released state
 
@@ -149,10 +146,10 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 
 | Area | What exists | What is missing |
 |---|---|---|
-| BASIC and Extended BASIC as languages | Language IDs registered, language configuration and presentation-only TextMate grammars shipped | Parser, semantics and editing features. Highlighting is complete |
+| BASIC and Extended BASIC as languages | Complete for Phase 1: identity, grammars, parser, binder, validator, editing services, build, packaging and run | Semantic highlighting and round-trip remain P2 |
 | BASIC build outputs | `basic-program` capability tokenises through xbas99 | No BASIC-primary project can reach it |
-| Extended BASIC auto-run disk | Behaviour verified, `xb-autorun-disk` target declared and routed | No build pipeline behind the target |
-| BASIC built-in metadata | 27 subprograms, 16 colours, dialect membership, 10 tests | Statements, functions, operators, keywords. Four entries flagged `confirm` pending manual verification |
+| ~~Extended BASIC auto-run disk~~ | **Implemented.** The template target produces a standard-format program named LOAD on DSK1 |  |
+| ~~BASIC built-in metadata~~ | **Implemented.** 102 builtins across subprograms, statements, commands, functions and operators. Zero unconfirmed entries |  |
 | Dialect compatibility analysis | Evidence detection implemented and tested both in source and in tokenised programs | The user-facing diagnostic and the compatibility command |
 | Import naming | `importFilename()` implemented and tested | No import command calls it |
 | BASIC test strategy | Lexer and evidence covered | Parser, round-trip, packaging, negative corpus |
@@ -161,8 +158,8 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 | Emulator process management | Launcher tracks the processes it starts | No Stop Emulator command |
 | Cartridge validation | Header space and size checks | Bank count, bank size, entry-symbol resolution |
 | Disk browser | Read-only catalog | Extract, add, replace, delete, rename |
-| Project wizard | Creates a multi-target project from `templates/multi-target` | The wizard question flow, and language selection for BASIC projects. See open decision D4 |
-| Templates | One assembly multi-target template | All BASIC and Extended BASIC templates |
+| Project wizard | Language-aware: creates assembly, TI BASIC or Extended BASIC projects | The full guided question flow, deferred by decision D-I |
+| Templates | Assembly multi-target, TI BASIC and Extended BASIC, all validating and building | The wider template catalogue in requirement 76 |
 | Build environment report | Toolchain Status shows much of the content | Not copyable as a report; no support bundle |
 | Marketplace metadata | Complete and valid in the manifest | Publisher not registered, so first publish is blocked |
 
@@ -173,18 +170,18 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 | ~~BASIC and Extended BASIC TextMate grammars~~ | **Implemented 2026-08-20.** Decision D-F |
 | Memory-map model, requirement 29.2 | **Not Implemented, future.** The command was renamed to Show Symbols so nothing advertises it. Decision D-G |
 | ~~embed-xb compatibility detection~~ | **Implemented 2026-08-20.** Decision D-K, `src/toolchain/embedxb.ts` |
-| BASIC parser, AST, binder | The dependency for everything in requirements 55 to 61 |
-| BASIC semantic validation | Depends on the parser |
-| BASIC completion, hover, signature help, semantic highlighting | Depends on the parser and the completed metadata |
-| BASIC control-flow and symbol analysis | |
+| ~~BASIC parser, AST, binder~~ | **Implemented.** `src/lang/basic/{parser,ast,binder}.ts`, 42 tests |
+| ~~BASIC semantic validation~~ | **Implemented.** `src/lang/basic/validator.ts`, conservative, zero false errors on the corpus |
+| BASIC completion, hover, signature help | **Implemented.** `src/lang/basic/providers.ts`. Semantic highlighting remains P2 |
+| BASIC control-flow and symbol analysis | **Partially Implemented.** The binder resolves lines, arrays, subprograms and scopes; the FOR/NEXT and reachability analyses remain P2 |
 | Renumbering and label mode | Designed in the BASIC report, not built |
-| Standard versus long format selection | The xbas99 default is standard; nothing selects long deliberately |
-| BASIC-native disk packaging | |
-| TI BASIC Run and Build and Run | |
-| Extended BASIC Run and Build and Run | |
+| ~~Standard versus long format selection~~ | **Implemented.** `basicFormat` selects it; the result is measured off the artifact and reported |
+| ~~BASIC-native disk packaging~~ | **Implemented** through the existing disk mechanism, no parallel implementation |
+| ~~TI BASIC Run and Build and Run~~ | **Implemented.** `classic99-basic` profile, no cartridge ROM required |
+| ~~Extended BASIC Run and Build and Run~~ | **Implemented.** `classic99-xb-program` profile |
 | Detokenisation | The prerequisite for all round-trip work |
 | Round-trip disk development | Import, diff, update, watcher |
-| Published JSON Schema for `ti99.json` | Placed at **early P1**, see the prioritised list for the reasoning |
+| ~~Published JSON Schema for `ti99.json`~~ | **Implemented.** `schemas/ti99.schema.json`, contributed via `jsonValidation`, tested to be no stricter than the loader |
 | Build profiles, debug and release | **Future, retained not superseded.** Decision D-H |
 | Signature help and semantic tokens for assembly | |
 | Synchronised listing navigation | |
@@ -426,25 +423,14 @@ This closes the architecture portion of the multi-language phase. It is **not** 
 - xbas99 tokenisation adapter, wired and running
 - Existing assembly regression baseline
 
-### Incomplete
+### Incomplete, carried to Phase 2 or P2
 
-- BASIC and Extended BASIC TextMate grammars
-- BASIC parser
-- AST
-- Binder
-- Semantic validation
-- Complete BASIC metadata inventories
-- BASIC as a primary project language
-- Standard versus long format selection
-- BASIC-native disk packaging
-- Extended BASIC auto-run disk pipeline
-- TI BASIC Run
-- TI BASIC Build and Run
-- Extended BASIC Run
-- Extended BASIC Build and Run
-- BASIC completion, hover, signature help and navigation
+- Semantic highlighting for BASIC
+- Renumbering and xbas99 label mode
 - Detokenisation
 - Round-trip disk development
+- Reachability and FOR/NEXT structural analysis
+- MERGE format and protected programs
 
 ### Phase 1 exit criteria
 
@@ -468,6 +454,32 @@ In addition:
 11. The full test count and package validation must be refreshed at phase exit.
 
 A phase is not complete because the resolver or the UI exists. End-to-end native build and run behaviour must pass.
+
+### Phase 1 exit assessment, 2026-08-20
+
+| Criterion | State | Evidence |
+|---|---|---|
+| 1. Create a TI BASIC project | Met | Language-aware wizard; `templates/ti-basic` |
+| 2. Edit with language support | Met | Grammar, completion, hover, signature help, symbols, definition, references |
+| 3. Validation before build | Met | Parser, binder and validator on the Problems panel, debounced live |
+| 4. Build a native program | Met | `basic-program` through xbas99; format measured and reported |
+| 5. Package it | Met | Disk image with the program as PROGRAM, via the existing disk mechanism |
+| 6. Launch an emulator | Met in configuration | `classic99-basic` needs no cartridge ROM |
+| 7. Run | Met | Staleness rules unchanged |
+| 8. Build and Run | Met | Validate, build, package, verify, launch, in that order |
+| 9. The same for Extended BASIC | Met | `templates/ti-extended-basic`, including the auto-run disk |
+| 10. Assembly regression-free | Met | 56 assembly and packaging tests green; Snake byte-identical |
+| 11. No placeholders | Met | No BASIC action reports a later phase |
+| 12. Documentation matches behaviour | Met | This document, the READMEs and the release notes |
+
+**Outstanding for closure: hands-on emulator confirmation.** Artifacts were
+verified structurally rather than visually: format, header, disk catalog and
+file type. Development cannot observe an emulator screen, so the seven manual
+Classic99 runs listed in the iteration plan remain the maintainer's to perform.
+Everything needed for them is staged.
+
+Phase 1 is therefore **implementation-complete and awaiting hands-on
+verification**, not yet formally closed.
 
 ---
 
@@ -1340,9 +1352,9 @@ These are **indicative research only, not authoritative community statistics.** 
 
 ## Current test status
 
-**158 passing, 0 failing, 0 skipped.** Lint clean, types clean, VSIX packages cleanly with no test fixtures included.
+**220 passing, 0 failing, 0 skipped.** Lint clean, types clean, VSIX packages at 70 files with no test fixtures included.
 
-Composition: 56 assembly and packaging, 31 BASIC-language, 57 routing, 14 toolchain compatibility.
+Composition: 56 assembly and packaging, 73 BASIC language, 20 BASIC build and schema, 57 routing, 14 toolchain compatibility.
 
 ## What is genuinely complete
 
@@ -1369,17 +1381,18 @@ Composition: 56 assembly and packaging, 31 BASIC-language, 57 routing, 14 toolch
 
 ## P0 blockers
 
-**None. All three were resolved on 2026-08-20.**
-
-1. **BASIC grammars** - shipped, presentation-only, with a test preventing recurrence.
-2. **Show Memory Map** - renamed to Show Symbols, old command id retained as a hidden alias.
-3. **embed-xb compatibility** - capability probe blocks an affected installation with an actionable diagnostic, and never modifies the user toolchain. The underlying risk was also found to be smaller than recorded: stock xdt99 fails hard and writes nothing rather than emitting a corrupt artifact.
+**None.** The three from the previous iteration were resolved on 2026-08-20 and
+nothing new was opened.
 
 ## Next logical implementation milestone
 
-**The BASIC parser, AST and binder,** followed immediately by **making BASIC a primary project language** so the tokenisation that already works becomes reachable.
+**Hands-on Classic99 verification of the seven scenarios**, then a preview
+release as `0.3.0-beta.1`.
 
-Those two unlock validation, the five BASIC targets, Run, Build and Run, and every editing feature. Everything else in Phase 1 depends on them. The P0 items should be cleared first because they are small and each one is currently misleading a user.
+After that, Phase 2: detokenisation, import from disk, source-versus-disk diff,
+update on disk, and the disk watcher. Detokenisation is the gate for all of it,
+and `xbas99 -d` already exists, so it is again connection work rather than new
+machinery.
 
 ## Open product decisions requiring PM input
 

@@ -161,7 +161,90 @@ dialect of your source and never modifies a file.
 
 ---
 
+## Getting a program to a user
+
+A TI-99/4A cannot run assembly from disk on its own. The console boots to TI
+BASIC, which has no `CALL LOAD`, and the disk controller serves files rather
+than executing them. Something in the cartridge port has to supply the loader,
+so the route you choose is really a choice about what your user already owns.
+
+| Route | They need | You ship |
+|---|---|---|
+| Cartridge | nothing | `.rpk` for MAME, or a `C.BIN` for Classic99 and FinalGROM 99 |
+| E/A option 5 | Editor/Assembler + 32K | a memory image, loaded by filename |
+| E/A option 3 | Editor/Assembler + 32K | a tagged object, entered by program name |
+| Extended BASIC | Extended BASIC + 32K | a disk with a `LOAD` program |
+
+Extended BASIC was in far more homes than Editor/Assembler, so an XB disk
+usually reaches more people than an E/A one. A cartridge reaches everybody.
+
+### Entry points differ, and it matters
+
+Only some loaders resolve the entry point by name:
+
+| Loader | Finds the entry by | Needs |
+|---|---|---|
+| console (cartridge) | `DATA` in the `>AA` header | a standard header |
+| E/A option 3 | name, from `DEF` | nothing |
+| XB `CALL LINK("NAME")` | name, from `DEF` | nothing |
+| E/A option 5 | the load address | entry first, or a branch to it |
+| `xas99 --embed-xb` | the code base | entry first, or a branch to it |
+
+If your entry point is not the first thing emitted — and it usually is not,
+because data tables tend to come first — the last two rows execute your data as
+instructions. A single `B @MAIN` ahead of everything satisfies both.
+
+### Two ways to build an Extended BASIC disk
+
+**Embedded, one file.** `xas99 --embed-xb` stores the code inside an XB program.
+The disk holds only `LOAD`. Simple to ship, but XB reads the whole program
+before running a single statement, so a large program means a long silence with
+nothing on screen.
+
+**Loader plus object, two files.** A small XB program prints progress and
+`CALL LOAD`s the object. It costs a second file, and buys feedback: the loader
+can print each step, and sprites set moving with `CALL SPRITE` keep moving
+during the load because the console interrupt routine drives them. If the
+machine hangs, they stop — which tells a user more than a frozen screen does.
+
+### Taking over from Extended BASIC
+
+XB does not have to survive. If your program never returns, it can own the
+machine, but it must stop XB's interrupt routine first or the two will fight
+over scratchpad. A bootstrap ahead of the game, and no change to the game
+itself, is usually enough:
+
+```asm
+XBBOOT LIMI 0                * before touching anything
+       LWPI MYWS             * our own workspace
+       CLR  R0
+       MOV  R0,@>83C4        * address of the user interrupt routine
+       MOVB R0,@>83C2        * flag byte controlling it
+       B    @MAIN
+```
+
+Those two locations are documented in appendix 24.3.1 of the Editor/Assembler
+manual. Clearing them leaves the console interrupt routine doing only its own
+work — the timer, sprite motion, and the sound list — which is what a program
+written for a cartridge already expects.
+
+### Writing a disk image to real media
+
+Every build that produces a disk image prints this, with the paths filled in:
+
+```
+xhm99.py -T snake.dsk -o snake.hfe
+```
+
+HFE is what a Gotek, a greaseweazle or an HxC floppy emulator expects, and a
+greaseweazle writes it to a physical disk. Converting back with `-F` returns
+the `.dsk` unchanged, so nothing is lost in the round trip. The `.dsk` itself
+works directly in Classic99, MAME and js99er.
+
+---
+
 ## Commands
+
 
 | Command | Default key |
 |---|---|

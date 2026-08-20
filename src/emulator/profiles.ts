@@ -184,7 +184,7 @@ export const CLASSIC99_XB_DISK: EmulatorProfile = {
     id: 'classic99-xbdisk',
     displayName: 'Classic99 — Extended BASIC cartridge + DSK1',
     kind: 'fiad-drop',
-    accepts: ['xb-program', 'disk-image'],
+    accepts: ['xb-program', 'basic-program', 'disk-image'],
     executable: '${config:ti99.emulator.classic99Path}',
     args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
     preLaunch: [
@@ -192,6 +192,9 @@ export const CLASSIC99_XB_DISK: EmulatorProfile = {
         // Staged rather than mounted. Mounting a disk is a manual step in
         // Classic99, and a stale file left in the FIAD folder will shadow the
         // image the user thinks they are running.
+        { action: 'copy', from: '${artifact:basic-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+        { action: 'copy', from: '${artifact:ea3-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${tiFilename}' },
+        // Single-file alternative: an embedded program needs no companion object.
         { action: 'copy', from: '${artifact:xb-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
     ],
     singleInstance: true,

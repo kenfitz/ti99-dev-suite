@@ -201,6 +201,27 @@ export class BuildCoordinator {
             this.output.appendLine(`  ${a.kind.padEnd(12)} ${a.path}  (${a.size} bytes)`);
         }
 
+        // A disk image is a distribution artifact, and getting one onto real
+        // media is the step people ask about. Print it once, next to the file
+        // it applies to, rather than leaving it in the documentation.
+        const disks = artifacts.filter(a => a.kind === 'disk-image');
+        if (disks.length) {
+            const tool = toolchain.tool?.directory
+                ? path.join(toolchain.tool.directory, 'xhm99.py')
+                : 'xhm99.py';
+            this.output.appendLine('');
+            this.output.appendLine('Writing a disk image to real media:');
+            for (const d of disks) {
+                const hfe = d.path.replace(/\.dsk$/i, '.hfe');
+                this.output.appendLine(`  ${toolchain.python?.path ?? 'python'} "${tool}" -T "${d.path}" -o "${hfe}"`);
+            }
+            this.output.appendLine('    Produces an HFE image: what a Gotek, a greaseweazle or an');
+            this.output.appendLine('    HxC floppy emulator expects. Converting back with -F returns');
+            this.output.appendLine('    the .dsk unchanged, so the round trip is lossless.');
+            this.output.appendLine('    A greaseweazle then writes it to a physical disk, and the');
+            this.output.appendLine('    .dsk itself works directly in Classic99, MAME and js99er.');
+        }
+
         return { success: true, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs, steps };
     }
 
@@ -261,6 +282,8 @@ export class BuildCoordinator {
             case 'cart-bin': return path.join(dist, config.cartridge?.binFilename ?? `${tiStem.slice(0, 9)}C.BIN`);
             case 'ea5-image': return path.join(dist, tiStem);
             case 'ea3-object': return path.join(dist, `${tiStem.slice(0, 9)}O`);
+            // Distinct from the 'tifiles' wrapper, which wraps the memory
+            // image; a target may build both and they cannot share a name.
             case 'ea3-tifiles': return path.join(dist, `${tiStem.slice(0, 9)}O.tfi`);
             case 'disk-image': return path.join(dist, `${stem}.dsk`);
             // Extended BASIC runs a program called LOAD from DSK1 at power-up,

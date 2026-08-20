@@ -9,6 +9,8 @@ export interface Ti99TaskDefinition extends vscode.TaskDefinition {
     task: string;
     /** Path to ti99.json when the workspace holds more than one project. */
     project?: string;
+    /** Distribution route, for projects that declare targets. */
+    target?: string;
 }
 
 /**
@@ -24,27 +26,44 @@ export class Ti99TaskProvider implements vscode.TaskProvider {
     constructor(private readonly projects: ProjectManager) {}
 
     provideTasks(): vscode.Task[] {
-        if (!this.projects.active) return [];
-        return [
+        const active = this.projects.active;
+        if (!active) return [];
+
+        const tasks = [
             this.make('build', 'Build', vscode.TaskGroup.Build),
             this.make('rebuild', 'Rebuild', vscode.TaskGroup.Build),
             this.make('clean', 'Clean', vscode.TaskGroup.Clean),
             this.make('run', 'Run in Emulator'),
         ];
+
+        // One task per distribution route, so "Run Task" can build a single
+        // one without going through the picker. Build above still does all.
+        for (const target of active.config.targets ?? []) {
+            tasks.push(this.make(
+                'buildTarget',
+                `Build ${target.label ?? target.id}`,
+                vscode.TaskGroup.Build,
+                target.id));
+        }
+
+        return tasks;
     }
 
     resolveTask(task: vscode.Task): vscode.Task | undefined {
         const def = task.definition as Ti99TaskDefinition;
         if (def.type !== Ti99TaskProvider.type || !def.task) return undefined;
-        return this.make(def.task, task.name, task.group);
+        return this.make(def.task, task.name, task.group, def.target);
     }
 
-    private make(name: string, label: string, group?: vscode.TaskGroup): vscode.Task {
+    private make(name: string, label: string, group?: vscode.TaskGroup, target?: string): vscode.Task {
         const definition: Ti99TaskDefinition = { type: Ti99TaskProvider.type, task: name };
+        if (target) definition.target = target;
 
         const commandId: string = ({
             build: 'ti99.build',
             rebuild: 'ti99.rebuild',
+            buildTarget: 'ti99.buildTarget',
+            rebuildTarget: 'ti99.rebuildTarget',
             clean: 'ti99.clean',
             package: 'ti99.build',
             run: 'ti99.run',
@@ -55,7 +74,7 @@ export class Ti99TaskProvider implements vscode.TaskProvider {
             vscode.TaskScope.Workspace,
             label,
             'TI-99',
-            new vscode.CustomExecution(async () => new CommandTerminal(commandId, label)));
+            new vscode.CustomExecution(async () => new CommandTerminal(commandId, label, target)));
 
         if (group) task.group = group;
         task.presentationOptions = {
@@ -74,12 +93,18 @@ class CommandTerminal implements vscode.Pseudoterminal {
     readonly onDidWrite = this.writeEmitter.event;
     readonly onDidClose = this.closeEmitter.event;
 
-    constructor(private readonly commandId: string, private readonly label: string) {}
+    constructor(
+        private readonly commandId: string,
+        private readonly label: string,
+        private readonly target?: string,
+    ) {}
 
     async open(): Promise<void> {
         this.writeEmitter.fire(`${this.label}...\r\n`);
         try {
-            const ok = await vscode.commands.executeCommand(this.commandId);
+            const ok = this.target === undefined
+                ? await vscode.commands.executeCommand(this.commandId)
+                : await vscode.commands.executeCommand(this.commandId, this.target);
             this.writeEmitter.fire(ok === false ? `${this.label} failed.\r\n` : `${this.label} finished.\r\n`);
             this.closeEmitter.fire(ok === false ? 1 : 0);
         } catch (err) {

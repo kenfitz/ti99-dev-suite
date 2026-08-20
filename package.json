@@ -394,6 +394,8 @@
             "enum": [
               "build",
               "rebuild",
+              "buildTarget",
+              "rebuildTarget",
               "clean",
               "package",
               "run"
@@ -402,6 +404,10 @@
           "project": {
             "type": "string",
             "description": "Path to ti99.json when the workspace holds more than one project."
+          },
+          "target": {
+            "type": "string",
+            "description": "Distribution route to build, for projects that declare targets in ti99.json."
           }
         }
       }

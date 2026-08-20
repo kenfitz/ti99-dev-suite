@@ -637,8 +637,8 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     register('ti99.build', () => doBuildAll(false));
     register('ti99.rebuild', () => doBuildAll(true));
-    register('ti99.buildTarget', () => doBuildTarget(false));
-    register('ti99.rebuildTarget', () => doBuildTarget(true));
+    register('ti99.buildTarget', (target?: string) => doBuildTarget(false, target));
+    register('ti99.rebuildTarget', (target?: string) => doBuildTarget(true, target));
     register('ti99.clean', doClean);
     register('ti99.run', () => doRun(undefined));
     register('ti99.buildAndRun', doBuildAndRun);
@@ -757,17 +757,31 @@ async function doBuild(options: { rebuild: boolean; target?: string }): Promise<
 }
 
 /** Build one route, chosen from the picker. */
-async function doBuildTarget(rebuild: boolean): Promise<boolean> {
+async function doBuildTarget(rebuild: boolean, target?: string): Promise<boolean> {
     const project = await requireReady();
     if (!project) return false;
-    if ((project.config.targets ?? []).length === 0) {
+
+    const ids = targetIds(project.config);
+    if (ids.length === 0) {
         void vscode.window.showInformationMessage(
             'This project defines no targets. Use TI-99: Build.');
         return doBuild({ rebuild });
     }
-    const target = await pickTarget(project, 'Which distribution route?');
-    if (!target) return false;
-    return doBuild({ rebuild, target });
+
+    // A caller may name the route - a task, a keybinding, another command -
+    // in which case there is nothing to ask.
+    if (target) {
+        if (!ids.includes(target)) {
+            void vscode.window.showErrorMessage(
+                `TI-99: unknown target '${target}'. This project defines: ${ids.join(', ')}.`);
+            return false;
+        }
+        return doBuild({ rebuild, target });
+    }
+
+    const picked = await pickTarget(project, 'Which distribution route?');
+    if (!picked) return false;
+    return doBuild({ rebuild, target: picked });
 }
 
 /**

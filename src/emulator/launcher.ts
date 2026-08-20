@@ -22,13 +22,30 @@ export class EmulatorLauncher implements vscode.Disposable {
     async pick(project: Project, artifacts: Artifact[]): Promise<EmulatorProfile | undefined> {
         const produced = artifacts.map(a => a.kind);
 
-        const configured = vscode.workspace.getConfiguration('ti99.emulator').get<string>('profile') ||
-            project.config.emulatorProfile;
+        // The project - or the active target within it - names a profile for the
+        // artifacts it actually builds, so it is more specific than a global
+        // setting and wins. The setting stays the default for projects that do
+        // not say. The old order let one setting force every target through the
+        // same emulator, which silently broke any target it could not run.
+        const setting = vscode.workspace.getConfiguration('ti99.emulator').get<string>('profile');
+        const configured = [project.config.emulatorProfile, setting]
+            .filter((id): id is string => Boolean(id));
 
-        if (configured) {
-            const found = BUILTIN_EMULATORS.find(e => e.id === configured);
-            if (found) return found;
-            this.output.appendLine(`Unknown emulator profile "${configured}"; falling back to a prompt.`);
+        for (const id of configured) {
+            const found = BUILTIN_EMULATORS.find(e => e.id === id);
+            if (!found) {
+                this.output.appendLine(`Unknown emulator profile "${id}"; ignoring it.`);
+                continue;
+            }
+            // A profile that accepts nothing this build produced would fail in
+            // preLaunch on a missing artifact. Skip it and say why.
+            if (!found.accepts.some(a => produced.includes(a))) {
+                this.output.appendLine(
+                    `Emulator profile "${id}" runs ${found.accepts.join(', ')}, but this build ` +
+                    `produced ${produced.join(', ')}. Skipping it.`);
+                continue;
+            }
+            return found;
         }
 
         const options = candidatesFor(produced, process.platform);

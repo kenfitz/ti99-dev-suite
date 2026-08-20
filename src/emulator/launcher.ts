@@ -27,7 +27,12 @@ export class EmulatorLauncher implements vscode.Disposable {
         // setting and wins. The setting stays the default for projects that do
         // not say. The old order let one setting force every target through the
         // same emulator, which silently broke any target it could not run.
-        const setting = vscode.workspace.getConfiguration('ti99.emulator').get<string>('profile');
+        // Scoped to the project folder. Without a resource, a multi-root
+        // workspace hides every folder-level .vscode/settings.json, so a
+        // per-project emulator setup silently does not exist.
+        const setting = vscode.workspace
+            .getConfiguration('ti99.emulator', project.root)
+            .get<string>('profile');
         const configured = [project.config.emulatorProfile, setting]
             .filter((id): id is string => Boolean(id));
 
@@ -92,7 +97,7 @@ export class EmulatorLauncher implements vscode.Disposable {
             const dot = key.lastIndexOf('.');
             const section = key.slice(0, dot);
             const name = key.slice(dot + 1);
-            const value = vscode.workspace.getConfiguration(section).get<string>(name);
+            const value = vscode.workspace.getConfiguration(section, project.root).get<string>(name);
             return !value || !value.trim();
         });
         if (missing.length) {
@@ -149,6 +154,14 @@ export class EmulatorLauncher implements vscode.Disposable {
                 `${profile.displayName} was not found at ${executable}. Update the path in TI-99 emulator settings.`);
             return false;
         }
+        // existsSync is true for a directory, and spawning one fails with an
+        // error that says nothing about the setting that caused it.
+        if (fs.statSync(executable).isDirectory()) {
+            void vscode.window.showErrorMessage(
+                `${profile.displayName}: ${executable} is a folder, not a program. ` +
+                `The setting wants the executable itself.`);
+            return false;
+        }
 
         const args = (profile.args ?? [])
             .map(a => resolve(a))
@@ -189,7 +202,7 @@ export class EmulatorLauncher implements vscode.Disposable {
 
     /** Build the ${...} substitution function for a launch. */
     private makeResolver(project: Project, artifacts: Artifact[]): (template: string) => string {
-        const cfg = vscode.workspace.getConfiguration();
+        const cfg = vscode.workspace.getConfiguration(undefined, project.root);
         const root = project.root.fsPath;
 
         const byKind = new Map<string, Artifact>();

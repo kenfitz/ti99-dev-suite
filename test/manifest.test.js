@@ -121,3 +121,29 @@ test('the licence names a copyright holder', () => {
   assert.doesNotMatch(text, /<YOUR NAME>/, 'licence still has a placeholder');
   assert.match(text, /Copyright \(c\) \d{4} .+/);
 });
+
+test('project settings are read with a resource scope', () => {
+  // getConfiguration() without a resource cannot see a folder-level
+  // .vscode/settings.json in a multi-root workspace, so a per-project
+  // toolchain or emulator setup silently does not exist. Language features
+  // scope to the document; everything project-shaped must scope to the
+  // project folder.
+  const files = [
+    'src/emulator/launcher.ts',
+    'src/toolchain/discovery.ts',
+    'src/build/coordinator.ts',
+  ];
+  const offenders = [];
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(root, f), 'utf8');
+    text.split('\n').forEach((line, i) => {
+      const m = /getConfiguration\(([^)]*)\)/.exec(line);
+      if (!m) return;
+      // A scope is a second argument, or the only one when the section is
+      // omitted as getConfiguration(undefined, scope).
+      const scoped = m[1].split(',').length >= 2;
+      if (!scoped) offenders.push(f + ':' + (i + 1) + '  getConfiguration(' + m[1].trim() + ')');
+    });
+  }
+  assert.deepStrictEqual(offenders, [], 'unscoped configuration reads');
+});

@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async e => {
         if (e.affectsConfiguration('ti99.toolchain')) {
-            toolchain = await discover(context);
+            toolchain = await discover(context, projects.active?.root);
             statusBar.update(projects, toolchain);
         }
         if (e.affectsConfiguration('ti99.syntaxDialect') || e.affectsConfiguration('ti99.diagnostics')) {
@@ -90,7 +90,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     // Probe the toolchain without blocking activation.
-    void discover(context).then(state => {
+    void discover(context, projects.active?.root).then(state => {
         toolchain = state;
         statusBar.update(projects, toolchain);
         if (state.problems.length) output.appendLine(describeState(state));
@@ -865,7 +865,7 @@ async function doBuildAndRun(): Promise<boolean> {
 }
 
 async function doToolchainStatus(context: vscode.ExtensionContext): Promise<void> {
-    toolchain = await discover(context);
+    toolchain = await discover(context, projects.active?.root);
     statusBar.update(projects, toolchain);
     output.clear();
     output.appendLine(describeState(toolchain));

@@ -25,11 +25,15 @@ export interface ToolchainState {
     };
     problems: string[];
     ready: boolean;
+    /** Folder these settings were resolved against, so later reads match. */
+    scope?: vscode.Uri;
 }
 
 interface SearchContext {
     workspaceFolder?: string;
     globalStorage?: string;
+    /** Folder whose settings apply; see discover(). */
+    scope?: vscode.Uri;
 }
 
 const PYTHON_CANDIDATES = process.platform === 'win32'
@@ -88,7 +92,7 @@ function expandSearchPath(raw: string, ctx: SearchContext): string[] {
 
     const cfg = /^\$\{config:([\w.]+)\}$/.exec(raw);
     if (cfg) {
-        const value = vscode.workspace.getConfiguration().get<string>(cfg[1]);
+        const value = vscode.workspace.getConfiguration(undefined, ctx.scope).get<string>(cfg[1]);
         return value ? [value] : [];
     }
 
@@ -131,8 +135,16 @@ export async function findTool(
     return undefined;
 }
 
-export async function discover(context: vscode.ExtensionContext): Promise<ToolchainState> {
-    const cfg = vscode.workspace.getConfiguration('ti99.toolchain');
+/**
+ * @param scope Project folder the toolchain is being resolved for. Settings are
+ *   read relative to it, so a folder-level .vscode/settings.json applies. In a
+ *   multi-root workspace an unscoped read cannot see those files at all.
+ */
+export async function discover(
+    context: vscode.ExtensionContext,
+    scope?: vscode.Uri,
+): Promise<ToolchainState> {
+    const cfg = vscode.workspace.getConfiguration('ti99.toolchain', scope);
     const problems: string[] = [];
 
     const python = await findPython(cfg.get<string>('pythonPath') || undefined);
@@ -150,14 +162,18 @@ export async function discover(context: vscode.ExtensionContext): Promise<Toolch
         return { python, problems, ready: false };
     }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // ${workspaceFolder} should mean the project being built, not whichever
+    // root happens to be first in a multi-root workspace.
+    const workspaceFolder = scope
+        ? vscode.workspace.getWorkspaceFolder(scope)?.uri.fsPath
+        : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const globalStorage = context.globalStorageUri.fsPath;
-    const found = await findTool(profile, python?.path, { workspaceFolder, globalStorage });
+    const found = await findTool(profile, python?.path, { workspaceFolder, globalStorage, scope });
     if (!found) {
         problems.push(
             `${profile.displayName} was not found. It is a directory of Python files, not a pip package — ` +
             `download it and point ti99.toolchain.xdt99Path at the folder containing ${profile.detect.files.join(' and ')}.`);
-        return { python, problems, ready: false };
+        return { python, problems, ready: false, scope };
     }
 
     const minimum = profile.detect.minimumVersion;
@@ -170,6 +186,7 @@ export async function discover(context: vscode.ExtensionContext): Promise<Toolch
         tool: { profile, directory: found.directory, version: found.version },
         problems,
         ready: !!python && problems.length === 0,
+        scope,
     };
 }
 
@@ -188,7 +205,7 @@ export function describeState(state: ToolchainState): string {
         lines.push('  Toolchain NOT FOUND');
     }
 
-    const emu = vscode.workspace.getConfiguration('ti99.emulator');
+    const emu = vscode.workspace.getConfiguration('ti99.emulator', state.scope);
     const classic99 = emu.get<string>('classic99Path');
     const mame = emu.get<string>('mamePath');
     lines.push('');

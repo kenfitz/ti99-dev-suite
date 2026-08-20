@@ -486,7 +486,7 @@ export class BuildCoordinator {
 
     private publish(project: Project, diagnostics: ParsedDiagnostic[]): void {
         const policy = vscode.workspace
-            .getConfiguration('ti99.diagnostics')
+            .getConfiguration('ti99.diagnostics', project.root)
             .get<UnresolvedPolicy>('unresolvedReferencePolicy', project.config.assembler.unresolvedReferencePolicy);
 
         const byFile = new Map<string, vscode.Diagnostic[]>();

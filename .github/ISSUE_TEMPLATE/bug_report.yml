@@ -1,0 +1,130 @@
+name: Bug report
+description: Something in the extension does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Assembler and emulator
+        behaviour varies a lot between setups, so the version fields below
+        usually decide whether a problem can be reproduced.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: A short description of the problem.
+    validations:
+      required: true
+
+  - type: input
+    id: ext-version
+    attributes:
+      label: Extension version
+      description: Extensions view, or `code --list-extensions --show-versions | findstr ti99`
+      placeholder: "0.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      description: Help → About
+      placeholder: "1.85.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: xdt99
+    attributes:
+      label: xdt99 version
+      description: "`xas99.py --version`. Leave blank if the problem does not involve building."
+      placeholder: "3.6.5"
+
+  - type: dropdown
+    id: emulator
+    attributes:
+      label: Emulator
+      description: Leave as "Not applicable" if the problem does not involve running.
+      options:
+        - Not applicable
+        - Classic99
+        - MAME
+        - Js99er
+        - Win994a
+        - Other
+        - Real hardware
+
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Syntax dialect
+      description: The `syntaxDialect` in your ti99.json, if relevant.
+      options:
+        - Not applicable / unsure
+        - xdt99 (extended)
+        - ea (strict)
+        - relaxed
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project containing ...
+        2. Run "TI-99: Build"
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output and logs
+      description: >
+        The TI-99 channel in the Output panel is the most useful thing you can
+        attach. Include the command line it printed and the tool's response.
+        This is rendered as a code block, so no backticks are needed.
+      render: text
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample source or project
+      description: >
+        A minimal .a99 file and ti99.json that reproduce the problem, if you
+        can share one. Trim it down as far as the problem survives.
+      render: text
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Whether it used to work, other extensions involved, and so on.

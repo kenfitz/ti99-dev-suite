@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  # Outside pull requests are not solicited, but any that arrive should still
+  # be checked before they are read. pull_request (not pull_request_target)
+  # runs fork code with a read-only token and no access to secrets.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The extension shells out to local tools and manipulates paths, so it
+        # is worth knowing the build holds on more than the author's machine.
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run check-types
+
+      - name: Compile
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Package (validates the .vsix builds)
+        run: npx vsce package --out ti99-dev-suite-ci.vsix
+
+      - name: List packaged contents
+        run: npx vsce ls --tree
+
+      - name: Upload .vsix
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-ci
+          path: ti99-dev-suite-ci.vsix
+          retention-days: 14

@@ -77,7 +77,36 @@ Assembler errors arrive as proper diagnostics with the offending token
 underlined, not the whole line — and without the duplicates xas99 emits once
 per pass.
 
+### It builds every distribution route from one source
+
+A TI-99 program reaches its user in one of three ways, and each needs a
+different prologue: a cartridge needs `AORG >6000` and a standard header, an
+Editor/Assembler option 5 image needs a branch at offset 0 because option 5
+executes from the load address, and anything that resolves the entry by name
+needs only `DEF`.
+
+A project can declare `targets` in `ti99.json` — distribution routes that each
+override part of the configuration and inherit the rest:
+
+```jsonc
+"targets": [
+  { "id": "cart", "label": "Cartridge",   "distDir": "dist/cart",
+    "outputs": ["cart-rpk", "cart-bin"],  "emulatorProfile": "classic99-cart" },
+  { "id": "ea",   "label": "Editor/Assembler", "distDir": "dist/ea",
+    "outputs": ["ea3-object", "ea5-image", "tifiles"] },
+  { "id": "disk", "label": "Extended BASIC boot disk", "distDir": "dist/disk",
+    "outputs": ["ea3-object", "basic-program", "basic-tifiles", "disk-image"] }
+]
+```
+
+**TI-99: Build** builds them all; **TI-99: Build Target...** builds one. Each
+target gets its own `build/` and `dist/` folder, and each is offered as a
+separate task under Run Task.
+
+Projects that declare no targets behave exactly as before.
+
 ### It is not locked to one toolchain
+
 
 xdt99 ships as the default profile, but the toolchain model is declarative.
 Register another assembler in `ti99.toolchain.profiles` with its own detection
@@ -103,7 +132,25 @@ copies.
 
 ---
 
+## Installation
+
+**From a release.** Download the `.vsix` from the
+[Releases page](https://github.com/kenfitz/ti99-dev-suite/releases), then
+either drop it on the Extensions view, or:
+
+```
+code --install-extension ti99-dev-suite-<version>.vsix
+```
+
+**From the Marketplace.** Not published yet — see
+[Project status](#project-status).
+
+**From source.** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+---
+
 ## Getting started
+
 
 1. **TI-99: Create New Project** and pick a target.
 2. Edit `src/main.a99`.
@@ -120,7 +167,8 @@ dialect of your source and never modifies a file.
 |---|---|
 | TI-99: Build | Ctrl+Shift+B |
 | TI-99: Build and Run | F5 |
-| TI-99: Rebuild / Clean | |
+| TI-99: Build Target... | |
+| TI-99: Rebuild / Rebuild Target... / Clean | |
 | TI-99: Create New Project | |
 | TI-99: Import Existing Source | |
 | TI-99: Convert Source to xas99 Syntax | |
@@ -166,7 +214,57 @@ output for you to drag in.
 
 ---
 
+## Project status
+
+Early but usable. The version number is honest: the language support,
+formatting, dialect handling, build pipeline and emulator launching all work
+and are used on real projects, but the extension has had few users besides its
+author, so expect rough edges on setups unlike mine.
+
+Not yet on the VS Code Marketplace. Install from a
+[release](https://github.com/kenfitz/ti99-dev-suite/releases) in the meantime.
+
+Reports from people running different toolchain versions, emulators and source
+dialects are the most useful thing anyone can contribute right now.
+
+---
+
+## Reporting bugs and requesting features
+
+Both are welcome, and both go through
+[GitHub Issues](https://github.com/kenfitz/ti99-dev-suite/issues).
+
+- **[Report a bug](https://github.com/kenfitz/ti99-dev-suite/issues/new?template=bug_report.yml)** —
+  the output from the **TI-99** channel in the Output panel is usually the
+  single most useful thing to attach, along with your xdt99 version and
+  emulator.
+- **[Request a feature](https://github.com/kenfitz/ti99-dev-suite/issues/new?template=feature_request.yml)** —
+  describing the TI-99/4A workflow you are trying to complete helps more than
+  proposing an implementation.
+
+Suspected security issues should be
+[reported privately](https://github.com/kenfitz/ti99-dev-suite/security/advisories/new)
+rather than in a public issue. See [SECURITY.md](SECURITY.md).
+
+**A note on code contributions:** the project is maintained directly by KF1TZ
+Software and is not currently accepting external pull requests. Please open an
+issue rather than sending a patch — [CONTRIBUTING.md](CONTRIBUTING.md) explains
+the reasoning. Forking for your own use is welcome under the MIT licence.
+
+---
+
+## Maintainer and licence
+
+Maintained by **KF1TZ Software**.
+
+Released under the [MIT licence](LICENSE.txt) — you may use, modify and
+redistribute it, including commercially, provided the copyright notice and
+licence text are kept.
+
+---
+
 ## Credits
+
 
 [xdt99](https://github.com/endlos99/xdt99) by Ralph Benzinger, GPL v3 —
 invoked as an external program, not bundled or modified. The xdt99 IntelliJ

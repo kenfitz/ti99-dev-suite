@@ -2,6 +2,10 @@
 .github/**
 src/**
 docs/**
+test/**
+eslint.config.mjs
+CONTRIBUTING.md
+SECURITY.md
 node_modules/**
 tsconfig.json
 .gitignore

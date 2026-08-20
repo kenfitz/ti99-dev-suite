@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # npm devDependencies only - this extension ships no runtime dependencies.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+    # One pull request per batch rather than one per package. On a solo project
+    # the review cost of a dozen separate bumps is the thing that makes
+    # dependency updates get ignored.
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keep the CI actions current; these are the only third-party code that runs
+  # with repository credentials.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"

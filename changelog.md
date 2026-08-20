@@ -3,6 +3,38 @@
 All notable changes to the TI-99/4A Development Suite are recorded here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Multi-target builds: a project can declare `targets` in `ti99.json` and build
+  a cartridge, an Editor/Assembler object and an Extended BASIC boot disk from
+  one source. `TI-99: Build` builds every route; `TI-99: Build Target...`
+  builds one. Each route is also offered as a task.
+- `basic-program` and `basic-tifiles` capabilities, so an Extended BASIC boot
+  disk can be built end to end — Extended BASIC runs a program called `LOAD`
+  from DSK1 at power-up.
+- `classic99-ea` and `classic99-xb` emulator profiles, which load the
+  Editor/Assembler and Extended BASIC cartridges. Running a non-cartridge build
+  still needs a cartridge: the bare console cannot load code from disk.
+- `tiName` project setting, controlling the filename used when staging into a
+  FIAD directory.
+
+### Fixed
+
+- Dialect hazard detection counted hazards with a regex over the raw line,
+  which misread labelled indirect addressing (`LBL MOVB *R1+,...`) as a
+  comment, counted a `*` inside a `;` comment, treated a tab as a single blank,
+  and let any `*Rn` on a line hide a real hazard elsewhere on it. It now uses
+  the field parser that the converter already used.
+- An emulator profile named by a global setting overrode the one named by the
+  project, so every target launched through the same emulator. The project's
+  choice now wins, and a profile that cannot accept what the build produced is
+  skipped rather than launched and left to fail.
+- `tifiles` never worked: the profile template referenced `${input}` and
+  `${fileType}`, neither of which was supplied.
+- `docs/` was being packaged into the `.vsix`.
+
 ## [0.1.0] — unreleased
 
 First release.

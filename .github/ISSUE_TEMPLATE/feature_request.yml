@@ -1,0 +1,73 @@
+name: Feature request
+description: Suggest a capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describing the TI-99/4A workflow you are trying to complete is more
+        useful than describing an implementation — it leaves room for a better
+        solution than either of us had in mind.
+
+  - type: textarea
+    id: capability
+    attributes:
+      label: Requested capability
+      description: In one or two sentences, what should the extension be able to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: >
+        What are you actually trying to get done, and what makes it awkward
+        today? Concrete examples from a real project help a lot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Proposed behaviour
+      description: >
+        How you imagine it working — a command, a setting, a ti99.json field,
+        a diagnostic. Rough sketches are fine.
+
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Which workflow does this affect?
+      multiple: true
+      options:
+        - Editing and syntax highlighting
+        - Formatting
+        - Dialect handling and diagnostics
+        - Building (xas99 / assembling)
+        - Cartridge output
+        - Editor/Assembler output
+        - Disk images and TIFILES
+        - Extended BASIC boot disks
+        - Emulator launching
+        - Real hardware (FinalGROM, FlashROM, CF)
+        - Project setup and templates
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        Other ways you have tried to solve this — a script, a task, a different
+        tool. Knowing what already almost works is useful.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >
+        Links to documentation, hardware references, forum threads, or an
+        existing tool that does this well.

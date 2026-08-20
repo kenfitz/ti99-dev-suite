@@ -292,6 +292,57 @@ works directly in Classic99, MAME and js99er.
 
 ---
 
+## Source file naming
+
+New projects use the canonical extension for their language. The aliases are
+recognised as first-class equivalents, not as deprecated spellings.
+
+| Language | Canonical | Alias |
+|---|---|---|
+| TMS9900 Assembly | `.a99` | `.asm` |
+| TI BASIC | `.b99` | |
+| TI Extended BASIC | `.xb99` | `.xb` |
+| GPL | `.g99` | `.gpl` |
+| BASIC, dialect unspecified | | `.bas` |
+
+`.a99` and `.g99` are the extensions xas99 and xga99 already look for, so the
+assembly and GPL naming is xdt99 naming rather than something invented here.
+`.xb99` is a modern convention introduced by this extension for consistency
+with that family; it was never used on the original TI.
+
+`.b99` needs one caution. xbas99 writes it when detokenizing **either**
+dialect, because xbas99 does not distinguish them, so an existing `.b99` file
+may well hold Extended BASIC. This extension adopts `.b99` for new TI BASIC
+source but never assumes an existing one is TI BASIC: project configuration, a
+per-file override, or an Extended BASIC construct in the source all take
+precedence over the name.
+
+`.bas` says nothing about dialect and is treated as neutral. When the dialect
+cannot be established the extension asks, because absence of Extended BASIC
+syntax is not evidence of TI BASIC. Every valid TI BASIC program is also a
+valid Extended BASIC program, so there is nothing to infer from.
+
+See [docs/source-naming.md](docs/source-naming.md) for the full precedence
+rules.
+
+## Commands and menus
+
+Right-clicking a TI source file gives a **TI-99/4A** submenu whose entries
+depend on what the file actually is:
+
+- An entry source offers Build, Run, Build and Run, Build and Run As, Package
+  and Validate.
+- A module belonging to one or more targets offers Build Containing Target
+  rather than pretending to be a standalone program.
+- A `.bas` file of unknown dialect offers only the dialect question.
+
+`Build and Run` uses the default target, so ordinary work is one click.
+`Build and Run As...` always shows the target list. A target that is
+compatible but unconfigured stays in the list and names the setting to fix.
+
+The same commands work from the Command Palette. Both surfaces call one
+resolver, so they cannot offer different targets for the same file.
+
 ## Emulator notes
 
 **Classic99** is launched with `classic99.exe -rom <file>`. This is not in the

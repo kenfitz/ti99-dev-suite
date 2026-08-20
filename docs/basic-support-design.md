@@ -421,3 +421,40 @@ otherwise.
 7. Character and sprite editors.
 
 Each phase ends with the full suite green, including the assembly tests.
+
+## 13. Source naming and command routing
+
+Settled after the naming research; see docs/source-naming.md for the full
+rules and src/actions for the implementation.
+
+Canonical extensions for new projects are `.a99`, `.b99`, `.xb99` and `.g99`,
+with `.asm`, `.xb` and `.gpl` as first-class aliases and `.bas` deliberately
+dialect-neutral. `.a99` and `.g99` match what xas99 and xga99 already search
+for. `.xb99` is new here and has no historical standing.
+
+`.b99` is the case that needed care. xbas99 writes it for both dialects, so an
+existing `.b99` file may hold Extended BASIC, and the import path would have
+mislabelled every Extended BASIC program it read if it had taken the default
+output name from xbas99. The dialect is resolved first; the filename follows
+from the answer.
+
+Language resolution runs on declarations and presumptions rather than a flat
+list. A per-file override or project configuration is a declaration and wins,
+reporting a conflict when the source contradicts it. The filename is only a
+presumption, weak for `.b99`, and deterministic Extended BASIC evidence
+outranks a weak one. Absence of evidence never resolves anything, because
+every valid TI BASIC program is also valid Extended BASIC.
+
+Evidence gathering has two forms and one rule: never scan bytes. In text the
+lexer supplies the modes, so an Extended BASIC name inside a string, a REM or
+a DATA item is not mistaken for code. In a tokenized program the scan walks
+the stream and steps over string, unquoted-string and line-number payloads.
+The concrete reason is that `GOTO 130` stores its line number as `>00 >82`,
+and `>82` is the `::` token, so a flat scan reports plain TI BASIC as Extended
+BASIC. A test fixture pins that.
+
+Command routing goes through one resolver shared by the Explorer menu, the
+Command Palette and the tree views, because two surfaces computing their own
+target lists drift apart and the wrong one is the one nobody tested. The
+resolver imports no vscode and is unit tested directly.
+

@@ -13,6 +13,9 @@ export type Capability =
     | 'disk-image' | 'tifiles' | 'basic-program' | 'basic-tifiles'
     | 'xb-program' | 'ea3-tifiles' | 'xb-tifiles';
 
+/** A source language this suite supports. See docs/source-naming.md. */
+export type SourceLanguage = 'tms9900' | 'ti-basic' | 'ti-extended-basic' | 'gpl';
+
 export type Processor = '9900' | '9995' | '99000' | 'f18a';
 
 export type UnresolvedPolicy = 'ignore' | 'information' | 'warning' | 'error';
@@ -82,6 +85,15 @@ export interface ProjectConfig {
     assembler: AssemblerOptions;
     /** Distribution routes. Omit for a single-output project. */
     targets?: TargetConfig[];
+    /**
+     * Language of this project. Declares intent, so it outranks the file
+     * extension: a .b99 file in an Extended BASIC project is Extended BASIC.
+     */
+    language?: SourceLanguage;
+    /** Target used when a command does not name one. */
+    defaultTarget?: string;
+    /** Per-source default targets, keyed by project-relative path. */
+    sourceDefaults?: Record<string, string>;
 }
 /**
  * One distribution route.
@@ -95,6 +107,8 @@ export interface ProjectConfig {
 export interface TargetConfig {
     /** Stable identifier, used on the command line and in the build cache. */
     id: string;
+    /** Language of this target, when it differs from the project. */
+    language?: SourceLanguage;
     /** Shown in the target picker. Defaults to the id. */
     label?: string;
     description?: string;

@@ -83,7 +83,53 @@ you are deliberately changing, but it means you should not, for example, add an
 `eslint-disable` comment to a module you did not otherwise touch. ESLint's
 config carries a file-scoped override for exactly this reason.
 
+## Repository protection
+
+Two rulesets apply to `main`. They are separate because bypass permissions are
+scoped to a whole ruleset, not to individual rules — putting both sets of rules
+in one would mean that bypassing CI also bypassed the force-push protection.
+
+**Protect main** — no bypass, applies to everyone including the owner:
+
+| Rule | Effect |
+|---|---|
+| `deletion` | `main` cannot be deleted |
+| `non_fast_forward` | `main` cannot be force-pushed |
+
+This is protection from accidents rather than from other people. A solo project
+has no one else to guard against, but `git push --force` after a bad rebase is
+still perfectly possible.
+
+**Require CI on main** — bypass for the Admin repository role:
+
+| Rule | Effect |
+|---|---|
+| `required_status_checks` | `Build and test (windows-latest)` and `(ubuntu-latest)` must pass |
+
+Be clear about what this does and does not do. It gates merges for anyone who
+is not an admin — Dependabot pull requests, and any fork pull request that
+arrives. It does **not** gate the maintainer's own direct pushes to `main`,
+because an admin bypasses it.
+
+That is deliberate. Without the bypass, a required status check blocks a direct
+push outright: the checks cannot have run on a commit that has not been pushed
+yet, so `git push origin main` would be rejected every time. The alternative —
+requiring a pull request for every change — is not a reasonable way to run a
+one-person project.
+
+The practical effect is that CI is advisory for the maintainer and binding for
+everyone else. If a second maintainer ever joins, removing the bypass makes it
+binding for them too.
+
+Neither ruleset requires reviews, and neither requires a pull request, so the
+normal workflow is unchanged:
+
+```
+git add -A && git commit && git push origin main
+```
+
 ## Packaging
+
 
 ```
 npm run package

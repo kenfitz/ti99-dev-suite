@@ -55,7 +55,55 @@ const DIALECT_CHOICES: DialectChoice[] = (['xdt99', 'ea', 'relaxed'] as SyntaxDi
     id,
 }));
 
-export async function createProject(): Promise<void> {
+interface RouteChoice extends vscode.QuickPickItem {
+    id: string;
+}
+
+const ROUTE_CHOICES: RouteChoice[] = [
+    {
+        label: 'Cartridge',
+        detail: 'Runs on a bare console. Reaches everybody, and needs nothing else.',
+        id: 'cart',
+    },
+    {
+        label: 'Extended BASIC disk',
+        detail: 'RUN "DSK1.LOAD". Extended BASIC was in far more homes than the Editor/Assembler module.',
+        id: 'disk-xb',
+    },
+    {
+        label: 'Editor/Assembler',
+        detail: 'Option 3 object and option 5 image. The developer route, and the one most sources assume.',
+        id: 'ea',
+    },
+];
+
+/** Copy a template tree, substituting {{PLACEHOLDER}} in every text file. */
+function copyTemplate(from: string, to: string, values: Record<string, string>): void {
+    for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+        const src = path.join(from, entry.name);
+        const dst = path.join(to, entry.name);
+        if (entry.isDirectory()) {
+            fs.mkdirSync(dst, { recursive: true });
+            copyTemplate(src, dst, values);
+            continue;
+        }
+        // Nothing in the template is binary, so this is safe and keeps the
+        // substitution in one place.
+        let text = fs.readFileSync(src, 'utf8');
+        for (const [key, value] of Object.entries(values)) {
+            text = text.split(`{{${key}}}`).join(value);
+        }
+        fs.mkdirSync(path.dirname(dst), { recursive: true });
+        fs.writeFileSync(dst, text, 'utf8');
+    }
+}
+
+/** Uppercase, at most `max` characters, and legal in a TI filename. */
+function tiName(name: string, max = 10): string {
+    return name.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, max) || 'PROGRAM';
+}
+
+export async function createProject(extensionUri: vscode.Uri): Promise<void> {
     const folder = await pickFolder('Where should the project be created?');
     if (!folder) return;
 
@@ -67,17 +115,19 @@ export async function createProject(): Promise<void> {
     });
     if (!name) return;
 
-    const typeChoice = await vscode.window.showQuickPick<TypeChoice>(TYPE_CHOICES, {
-        title: 'What are you building?',
-        matchOnDetail: true,
-    });
-    if (!typeChoice) return;
-
     const dialectChoice = await vscode.window.showQuickPick<DialectChoice>(DIALECT_CHOICES, {
         title: 'Which assembly syntax?',
         matchOnDetail: true,
     });
     if (!dialectChoice) return;
+
+    // Every route is generated either way. This only decides which one Build
+    // and Run reaches for first.
+    const route = await vscode.window.showQuickPick<RouteChoice>(ROUTE_CHOICES, {
+        title: 'Which route should Build and Run use by default?',
+        matchOnDetail: true,
+    });
+    if (!route) return;
 
     const configPath = path.join(folder.fsPath, PROJECT_FILENAME);
     if (fs.existsSync(configPath)) {
@@ -87,64 +137,54 @@ export async function createProject(): Promise<void> {
     }
 
     const stem = name.replace(/[^\w.-]/g, '_');
+    const base = tiName(name, 9);
+    const menu = name.toUpperCase().slice(0, 20);
 
-    const config: ProjectConfig = {
-        ...DEFAULT_PROJECT,
-        name,
-        type: typeChoice.type,
-        syntaxDialect: dialectChoice.id,
-        outputs: typeChoice.outputs,
-        emulatorProfile: typeChoice.emulator,
-        entrySource: 'src/main.a99',
-        sources: ['src/main.a99'],
-        cartridge: typeChoice.type.startsWith('cartridge')
-            ? {
-                name: name.toUpperCase().slice(0, 20),
-                baseAddress: '>6000',
-                banking: 'none',
-                binFilename: `${stem.toUpperCase().slice(0, 9)}C.BIN`,
-            }
-            : undefined,
-        disk: typeChoice.outputs.includes('disk-image')
-            ? {
-                geometry: 'sssd',
-                volumeName: stem.toUpperCase().slice(0, 10),
-                files: [
-                    {
-                        artifact: typeChoice.type === 'ea3-object' ? 'ea3-object' : 'ea5-image',
-                        tiName: stem.toUpperCase().slice(0, 10),
-                        format: typeChoice.type === 'ea3-object' ? 'DIS/FIX 80' : 'PROGRAM',
-                    },
-                ],
-            }
-            : undefined,
-        assembler: {
-            unresolvedReferencePolicy: defaultUnresolvedPolicy(typeChoice.type),
-            extraArgs: [],
-        },
-    };
+    const template = path.join(extensionUri.fsPath, 'templates', 'multi-target');
+    if (!fs.existsSync(template)) {
+        void vscode.window.showErrorMessage(
+            `The project template is missing from the extension at ${template}.`);
+        return;
+    }
 
-    fs.mkdirSync(path.join(folder.fsPath, 'src'), { recursive: true });
-    fs.mkdirSync(path.join(folder.fsPath, 'lib'), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+    try {
+        fs.mkdirSync(path.join(folder.fsPath, 'lib'), { recursive: true });
+        copyTemplate(template, folder.fsPath, {
+            NAME: name,
+            STEM: stem,
+            TINAME: base,
+            // The Extended BASIC object shares a FIAD folder with the
+            // Editor/Assembler one, so it needs a name of its own.
+            XBNAME: `${base}X`,
+            MENUNAME: menu,
+            MENULEN: String(menu.length),
+            DIALECT: dialectChoice.id,
+        });
+    } catch (err) {
+        void vscode.window.showErrorMessage(`Could not create the project: ${(err as Error).message}`);
+        return;
+    }
+
+    // Put the chosen route first; resolveTarget treats that as the default.
+    if (route.id !== 'cart') {
+        try {
+            const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8')) as ProjectConfig;
+            const targets = cfg.targets ?? [];
+            const picked = targets.find(t => t.id === route.id);
+            if (picked) {
+                cfg.targets = [picked, ...targets.filter(t => t !== picked)];
+                fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+            }
+        } catch { /* the template is still valid, just ordered differently */ }
+    }
 
     const mainPath = path.join(folder.fsPath, 'src', 'main.a99');
-    if (!fs.existsSync(mainPath)) {
-        fs.writeFileSync(mainPath, starterSource(config), 'utf8');
-    }
-
-    const readmePath = path.join(folder.fsPath, 'README.md');
-    if (!fs.existsSync(readmePath)) {
-        fs.writeFileSync(readmePath, starterReadme(config, typeChoice), 'utf8');
-    }
-
-    fs.writeFileSync(path.join(folder.fsPath, '.gitignore'), `${config.buildDir}/\n${config.distDir}/\n`, 'utf8');
-
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(mainPath));
     await vscode.window.showTextDocument(doc);
 
     const openFolder = await vscode.window.showInformationMessage(
-        `Created ${name}. Press F5 to build and run.`, 'Open Folder');
+        `Created ${name}: cartridge, Editor/Assembler and Extended BASIC disk, all from src/main.a99. ` +
+        `Press F5 to build and run.`, 'Open Folder');
     if (openFolder === 'Open Folder') {
         await vscode.commands.executeCommand('vscode.openFolder', folder, { forceNewWindow: false });
     }
@@ -283,185 +323,4 @@ async function pickFolder(title: string): Promise<vscode.Uri | undefined> {
         openLabel: 'Select',
     });
     return picked?.[0];
-}
-
-function starterSource(config: ProjectConfig): string {
-    const cart = config.type.startsWith('cartridge');
-
-    if (cart) {
-        return `*----------------------------------------------------------------------
-* ${config.name}
-*
-* Build: TI-99: Build       Run: TI-99: Build and Run (F5)
-*----------------------------------------------------------------------
-       DEF  STDHDR
-
-VDPWD  EQU  >8C00                * VDP write data
-VDPWA  EQU  >8C02                * VDP set address
-WRKSP  EQU  >8300                * Scratchpad workspace, no wait states
-
-       AORG >6000
-
-STDHDR BYTE >AA                  * Standard header marker
-       BYTE >01                  * Version
-       BYTE >01                  * One program
-       BYTE >00                  * Reserved
-       DATA >0000                * Power-up list
-       DATA PROG                 * Program list
-       DATA >0000                * DSR list
-       DATA >0000                * Subprogram list
-       DATA >0000                * ISR list
-
-PROG   DATA >0000                * No next item
-       DATA MAIN                 * Entry point
-       BYTE ${String(config.cartridge?.name.length ?? 8).padEnd(2)}                    * Menu text length
-       TEXT '${config.cartridge?.name ?? 'MY PROGRAM'}'
-       EVEN
-
-MAIN   LIMI 0                    * Interrupts off during setup
-       LWPI WRKSP                * Our own workspace
-       CLR  R0
-       MOVB R0,@>837A            * No sprites in automatic motion
-
-       LI   R1,REGLD             * Load the VDP registers
-       LI   R2,>8000
-REGLP  MOVB *R1+,R3
-       MOVB R3,@VDPWA
-       MOVB R2,@VDPWA
-       AI   R2,>0100
-       CI   R2,>8800
-       JL   REGLP
-
-       LI   R0,>4000             * Clear the screen
-       SWPB R0
-       MOVB R0,@VDPWA
-       SWPB R0
-       MOVB R0,@VDPWA
-       LI   R1,>2000
-       LI   R2,24*32
-CLRLP  MOVB R1,@VDPWD
-       DEC  R2
-       JNE  CLRLP
-
-       LI   R0,10*32+9           * Row 10, column 9
-       ORI  R0,>4000
-       SWPB R0
-       MOVB R0,@VDPWA
-       SWPB R0
-       MOVB R0,@VDPWA
-       LI   R1,MSG
-       LI   R2,MSGL
-MSGLP  MOVB *R1+,@VDPWD
-       DEC  R2
-       JNE  MSGLP
-
-HALT   JMP  HALT
-
-REGLD  BYTE >00                  * R0: graphics I
-       BYTE >E0                  * R1: 16K, display on, interrupts on
-       BYTE >00                  * R2: screen image at >0000
-       BYTE >0E                  * R3: colour table at >0380
-       BYTE >01                  * R4: pattern table at >0800
-       BYTE >06                  * R5: sprite attributes at >0300
-       BYTE >00                  * R6: sprite patterns at >0000
-       BYTE >07                  * R7: white on cyan
-       EVEN
-
-MSG    TEXT 'HELLO TI-99/4A'
-MSGL   EQU  $-MSG
-       EVEN
-
-       END  MAIN
-`;
-    }
-
-    return `*----------------------------------------------------------------------
-* ${config.name}
-*
-* Build: TI-99: Build       Run: TI-99: Build and Run (F5)
-*
-* The Editor/Assembler cartridge supplies these utilities, so the
-* "unresolved references" warning for them is expected.
-*----------------------------------------------------------------------
-       REF  VMBW,KSCAN
-       DEF  START
-
-WRKSP  EQU  >8300                * Scratchpad workspace
-
-       AORG >A000
-
-SFIRST EQU  $                    * First byte saved in the image
-
-START  LIMI 0
-       LWPI WRKSP
-
-       LI   R0,10*32+9           * Row 10, column 9
-       LI   R1,MSG
-       LI   R2,MSGL
-       BLWP @VMBW
-
-WAIT   CLR  R0                   * Wait for a keypress
-       MOVB R0,@>8374
-       BLWP @KSCAN
-       MOVB @>837C,R0
-       COC  @KEYMSK,R0
-       JNE  WAIT
-
-       LIMI 2
-       B    @>0070               * Back to the E/A menu
-
-KEYMSK DATA >2000
-MSG    TEXT 'HELLO TI-99/4A'
-MSGL   EQU  $-MSG
-       EVEN
-
-SLAST  EQU  $                    * Last byte saved
-SLOAD  EQU  SFIRST
-       END  START
-`;
-}
-
-function starterReadme(config: ProjectConfig, choice: TypeChoice): string {
-    return `# ${config.name}
-
-${choice.detail}
-
-## Build
-
-| Action | Command |
-|---|---|
-| Build | \`TI-99: Build\` or Ctrl+Shift+B |
-| Build and run | \`TI-99: Build and Run\` or F5 |
-| Clean | \`TI-99: Clean\` |
-
-## Outputs
-
-Artifacts land in \`${config.distDir}/\`; listings and symbol files in \`${config.buildDir}/\`.
-
-${config.outputs.map(o => `- \`${o}\``).join('\n')}
-
-## Syntax dialect
-
-This project is set to **${DIALECTS[config.syntaxDialect].label}**.
-
-${DIALECTS[config.syntaxDialect].description}
-
-The comment field begins at ${DIALECTS[config.syntaxDialect].commentRule}. If you
-paste in code written for a different assembler, run
-\`TI-99: Check for Dialect Hazards\` before building.
-
-## Emulator
-
-Set the emulator path in Settings under **TI-99: Emulators**. This project
-defaults to the \`${choice.emulator}\` profile.
-
-Cartridge ROMs, Editor/Assembler images and console ROMs are not distributed
-with the extension. Point the settings at your own copies.
-
-## Real hardware
-
-The build outputs are standard formats and work on original hardware:
-FinalGROM 99 and FlashROM 99 take the cartridge binary, and \`xdm99\` or
-\`xhm99\` can move the disk image onto a CF card or HFE image.
-`;
 }

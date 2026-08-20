@@ -1,0 +1,184 @@
+*----------------------------------------------------------------------
+* {{NAME}} - shared program body
+*
+* This is the file to edit. It contains the whole program and nothing
+* loader-specific: no AORG, no cartridge header, no DEF. Each file in
+* targets/ supplies the prologue its loader needs and then COPYs this.
+*
+* That is what lets one source ship as a cartridge, as an
+* Editor/Assembler program, and on an Extended BASIC disk, without
+* keeping three copies of the code in step.
+*
+* MAIN is the entry point. Everything below it is yours.
+*----------------------------------------------------------------------
+
+*----------------------------------------------------------------------
+* Hardware
+*
+* The TMS9918 video processor is reached through two memory-mapped
+* ports. To write to VDP address A, send the low byte of A, then the
+* high byte with bit 6 set (>40), then the data. To read, send the low
+* byte and the high byte with bit 6 clear, then read.
+*----------------------------------------------------------------------
+VDPWD  EQU  >8C00             * VDP write data
+VDPWA  EQU  >8C02             * VDP set read/write address
+VDPRD  EQU  >8800             * VDP read data
+VDPSTA EQU  >8802             * VDP status
+
+*----------------------------------------------------------------------
+* Scratchpad RAM, >8300 to >83FF
+*
+* 256 bytes of fast RAM inside the console, and the only RAM a bare
+* console has. On a cartridge the code itself is in ROM and cannot be
+* written, so anything that changes at run time lives here or in VDP
+* RAM. Keep that in mind before adding a variable next to the code.
+*
+* >8300..>831F is our workspace: the sixteen registers R0..R15.
+* >8320 upwards is free for variables. The console keeps its own state
+* from >83C0 up, so do not go past >83BF.
+*----------------------------------------------------------------------
+WRKSP  EQU  >8300             * Our workspace - R0..R15 live here
+R0LB   EQU  WRKSP+1           * Low byte of R0, handy for VDP addresses
+
+COUNT  EQU  >8320             * Example variable. Add your own below.
+
+*----------------------------------------------------------------------
+* VDP memory map
+*
+* These must match the register values in REGLD at the bottom.
+*----------------------------------------------------------------------
+NAMETB EQU  >0000             * Screen image, 24 rows x 32 columns
+COLRTB EQU  >0380             * Colour table
+PTRNTB EQU  >0800             * Character patterns
+
+*----------------------------------------------------------------------
+* MAIN - entry point
+*
+* Every target reaches this label, whatever route it took to get here.
+* Interrupts are off and the workspace is ours.
+*----------------------------------------------------------------------
+MAIN   LIMI 0                 * Interrupts off while we set up
+       LWPI WRKSP             * Our own workspace
+
+       CLR  R0
+       MOVB R0,@>837A         * No sprites in automatic motion
+
+       BL   @VIDEO            * Set up the screen
+       BL   @CLS              * Clear it
+
+* Write the greeting at row 10, column 10.
+       LI   R0,10*32+10       * Screen position, as row*32+column
+       LI   R1,MSG
+       LI   R2,MSGL
+       BL   @VMBW
+
+*----------------------------------------------------------------------
+* Your program goes here.
+*
+* Useful things to know when adding to it:
+*
+*   - BL @ROUTINE calls; RT returns. R11 holds the return address, so
+*     save it before calling something else from inside a routine.
+*   - The utilities below need no Editor/Assembler, which is why this
+*     runs on a bare console from a cartridge.
+*   - Screen position is row*32+column, rows and columns counted from
+*     zero, 24 rows of 32 columns.
+*   - A character is a byte. Space is >20. The pattern table holds the
+*     shapes; write to it with VMBW to define your own.
+*   - LIMI 2 enables interrupts, which you need for sound and for
+*     automatic sprite motion. LIMI 0 turns them off again.
+*----------------------------------------------------------------------
+
+HALT   JMP  HALT              * Spin forever. Replace with your loop.
+
+*----------------------------------------------------------------------
+* Utilities
+*
+* Written out here rather than REFed from the Editor/Assembler, so the
+* program does not depend on that cartridge being present.
+*----------------------------------------------------------------------
+
+* Each of these is a leaf: it calls nothing else, so R11 holds the
+* return address for the whole routine and there is no need to save it.
+* Keep it that way, or save R11 before calling out of one of them.
+
+* VIDEO - load the eight VDP registers from REGLD.
+*         Clobbers R1, R2, R3.
+VIDEO  LI   R1,REGLD
+       LI   R2,>8000          * Register 0, write bit set
+VIDLP  MOVB *R1+,R3
+       MOVB R3,@VDPWA         * Value first
+       MOVB R2,@VDPWA         * Then the register number
+       AI   R2,>0100
+       CI   R2,>8800
+       JL   VIDLP
+       RT
+
+* CLS - fill the screen with spaces.
+*       Clobbers R0, R1, R2.
+CLS    LI   R0,NAMETB
+       ORI  R0,>4000          * Set the write bit
+       SWPB R0
+       MOVB R0,@VDPWA         * Low byte of the address first
+       SWPB R0
+       MOVB R0,@VDPWA         * Then the high byte
+       LI   R1,>2000          * Space, in the high byte
+       LI   R2,24*32
+CLSLP  MOVB R1,@VDPWD
+       DEC  R2
+       JNE  CLSLP
+       RT
+
+* VSBW - write the single byte in the high half of R1 to VDP address R0.
+*        Clobbers R0.
+VSBW   ORI  R0,>4000
+       SWPB R0
+       MOVB R0,@VDPWA
+       SWPB R0
+       MOVB R0,@VDPWA
+       MOVB R1,@VDPWD
+       RT
+
+* VMBW - write R2 bytes from CPU address R1 to VDP address R0.
+*        Clobbers R0, R1, R2.
+VMBW   ORI  R0,>4000
+       SWPB R0
+       MOVB R0,@VDPWA
+       SWPB R0
+       MOVB R0,@VDPWA
+VMBWLP MOVB *R1+,@VDPWD
+       DEC  R2
+       JNE  VMBWLP
+       RT
+
+* VWTR - write the byte in the high half of R1 to VDP register R0.
+*        Clobbers R0, R1.
+VWTR   SWPB R1
+       MOVB R1,@VDPWA
+       ORI  R0,>8000
+       SWPB R0
+       MOVB R0,@VDPWA
+       SWPB R0
+       RT
+
+*----------------------------------------------------------------------
+* Data
+*
+* On a cartridge this is in ROM and cannot be written. Variables belong
+* in scratchpad, next to COUNT above.
+*----------------------------------------------------------------------
+REGLD  BYTE >00               * R0: graphics I, no external video
+       BYTE >E0               * R1: 16K, display on, interrupts on
+       BYTE >00               * R2: screen image at >0000
+       BYTE >0E               * R3: colour table at >0380
+       BYTE >01               * R4: pattern table at >0800
+       BYTE >06               * R5: sprite attributes at >0300
+       BYTE >00               * R6: sprite patterns at >0000
+       BYTE >07               * R7: white on transparent
+       EVEN
+
+MSG    TEXT 'HELLO WORLD!'
+MSGL   EQU  $-MSG
+       EVEN
+
+       END  MAIN

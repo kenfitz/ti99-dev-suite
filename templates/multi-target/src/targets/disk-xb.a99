@@ -1,0 +1,49 @@
+*----------------------------------------------------------------------
+* Target: Extended BASIC disk
+*
+* Builds     dist/disk-xb/{{STEM}}.dsk holding LOAD and {{XBNAME}}
+* Requires   Extended BASIC cartridge + 32K expansion + disk
+*            (no Editor/Assembler)
+*
+*   RUN "DSK1.LOAD"
+*
+* Extended BASIC was in far more homes than the Editor/Assembler module,
+* so this is usually the disk that reaches the most people.
+*
+* XB is only the loader here. ../../boot/LOAD.b99 does CALL LOAD to read
+* this object, then CALL LINK("XBBOOT") to enter it, and we never return.
+*
+* Taking the machine matters because XB does not simply step aside. It
+* keeps interpreter state across scratchpad and installs its own
+* interrupt routine, and a program written for a cartridge expects both
+* to be its own. Interrupts go off first, then the two locations that
+* let XB back in are cleared. Appendix 24.3.1 of the Editor/Assembler
+* manual documents them: a flag byte controlling the interrupt routine,
+* and the address of the user-defined interrupt routine.
+*
+* What survives is the console's own interrupt routine, doing only its
+* built-in work - the timer, sprite motion, and the sound list. That is
+* what a cartridge program already relies on, which is why the shared
+* body needs no changes for this target.
+*----------------------------------------------------------------------
+       DEF  MAIN,XBBOOT
+
+XBBOOT LIMI 0                * Before anything else: stop XB's interrupt
+*                              routine running while we take the machine
+*                              apart underneath it.
+
+       LWPI WRKSP            * Our own workspace, not XB's
+
+       CLR  R0
+       MOV  R0,@>83C4        * Address of the user interrupt routine
+       MOVB R0,@>83C2        * Flag byte controlling the interrupt routine
+       MOVB R0,@>837A        * No sprites in automatic motion
+
+* The keyboard scan copies >83D4 into VDP register 1 whenever it sees a
+* new key, so keep that byte matching what REGLD sets.
+       LI   R0,>E000
+       MOVB R0,@>83D4
+
+       B    @MAIN
+
+       COPY "../main.a99"

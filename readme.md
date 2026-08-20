@@ -152,9 +152,36 @@ code --install-extension ti99-dev-suite-<version>.vsix
 ## Getting started
 
 
-1. **TI-99: Create New Project** and pick a target.
+1. **TI-99: Create New Project**, name it, pick a syntax dialect, and choose
+   which route **Build and Run** should use by default.
 2. Edit `src/main.a99`.
 3. Press **F5**.
+
+The new project prints `HELLO WORLD!` and already builds three ways — a
+cartridge, an Editor/Assembler program, and an Extended BASIC disk — from that
+one file:
+
+```
+src/
+  main.a99             the program - the file you edit
+  targets/
+    cart.a99           cartridge            ->  dist/cart/
+    ea.a99             Editor/Assembler     ->  dist/ea/
+    disk-xb.a99        Extended BASIC disk  ->  dist/disk-xb/
+boot/
+  LOAD.b99             Extended BASIC loader, tokenised onto the disk
+```
+
+`src/main.a99` carries no `AORG`, no cartridge header and no `DEF`: each
+wrapper supplies the prologue its loader needs and then `COPY`s the body, so
+adding to the program means editing one file. It is commented for someone new
+to the machine — the VDP ports, what lives in scratchpad, why a cartridge
+cannot write to its own data, and where to put your code — which also gives an
+assistant enough context to help you write it.
+
+The utility routines it ships with (`VSBW`, `VMBW`, `VWTR`, `CLS`) mean the
+program needs nothing from the Editor/Assembler, which is what lets the same
+source run from a cartridge on a bare console.
 
 Importing existing code instead? **TI-99: Import Existing Source** detects the
 dialect of your source and never modifies a file.

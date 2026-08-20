@@ -642,7 +642,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
     register('ti99.clean', doClean);
     register('ti99.run', () => doRun(undefined));
     register('ti99.buildAndRun', doBuildAndRun);
-    register('ti99.newProject', createProject);
+    register('ti99.newProject', () => createProject(context.extensionUri));
     register('ti99.importProject', importProject);
     register('ti99.toolchainStatus', () => doToolchainStatus(context));
     register('ti99.configureToolchain', doConfigureToolchain);

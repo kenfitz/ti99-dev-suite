@@ -12,7 +12,7 @@
 
 | File | Role |
 |---|---|
-| `docs/requirements.md` | The original 46-section assembly specification, long form. Superseded by this document where they conflict. See open decision D7. |
+| `docs/archive/requirements-assembly-original.md` | The original 46-section assembly specification. Archived, historical reference only, superseded by this document. Decision D7. |
 | `docs/audit-2026-08-20.md` | Full implementation evidence, file and line level |
 | `docs/basic-support-design.md` | BASIC research and architecture, including the verified auto-run result |
 | `docs/source-naming.md` | Canonical naming and the resolution-strength model |
@@ -56,22 +56,27 @@ The product should feel closer to Visual Studio for a modern platform than to a 
 Verified by execution on 2026-08-20:
 
 ```
-133 tests passing
+158 tests passing
   0 tests failing
   0 tests skipped
 Lint clean
 Types clean
-VSIX packages at 54 files, 141 KB, no test fixtures included
+VSIX packages cleanly, no test fixtures included
 ```
 
 Test composition, corrected against the previous record of 45/48/40:
 
 | Group | Count | Files |
 |---|---|---|
-| Assembly | 45 | `dialect` 10, `project` 12, `manifest` 14, `template` 9 |
+| Assembly and packaging | 56 | `dialect` 10, `project` 12, `manifest` 25, `template` 9 |
 | BASIC language | 31 | `basic-lexer` 21, `basic-metadata` 10 |
 | Routing and actions | 57 | `actions-evidence` 13, `actions-language` 16, `actions-resolver` 28 |
-| **Total** | **133** | |
+| Toolchain compatibility | 14 | `embedxb` 14 |
+| **Total** | **158** | |
+
+The assembly group grew from 45 to 56 because the manifest guards now also
+cover grammar contribution and the Show Symbols rename. The 14 new toolchain
+tests cover the embed-xb compatibility decision.
 
 ## Released state
 
@@ -144,7 +149,7 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 
 | Area | What exists | What is missing |
 |---|---|---|
-| BASIC and Extended BASIC as languages | Language IDs registered, language configuration shipped | **No TextMate grammar for either.** See P0-1 |
+| BASIC and Extended BASIC as languages | Language IDs registered, language configuration and presentation-only TextMate grammars shipped | Parser, semantics and editing features. Highlighting is complete |
 | BASIC build outputs | `basic-program` capability tokenises through xbas99 | No BASIC-primary project can reach it |
 | Extended BASIC auto-run disk | Behaviour verified, `xb-autorun-disk` target declared and routed | No build pipeline behind the target |
 | BASIC built-in metadata | 27 subprograms, 16 colours, dialect membership, 10 tests | Statements, functions, operators, keywords. Four entries flagged `confirm` pending manual verification |
@@ -165,9 +170,9 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 
 | Area | Note |
 |---|---|
-| BASIC and Extended BASIC TextMate grammars | **P0-1** |
-| Memory-map model, requirement 29.2 | **P0-2**. The `Show Memory Map` command currently focuses the symbol table |
-| embed-xb compatibility detection | **P0-3** |
+| ~~BASIC and Extended BASIC TextMate grammars~~ | **Implemented 2026-08-20.** Decision D-F |
+| Memory-map model, requirement 29.2 | **Not Implemented, future.** The command was renamed to Show Symbols so nothing advertises it. Decision D-G |
+| ~~embed-xb compatibility detection~~ | **Implemented 2026-08-20.** Decision D-K, `src/toolchain/embedxb.ts` |
 | BASIC parser, AST, binder | The dependency for everything in requirements 55 to 61 |
 | BASIC semantic validation | Depends on the parser |
 | BASIC completion, hover, signature help, semantic highlighting | Depends on the parser and the completed metadata |
@@ -180,7 +185,7 @@ Corrected to 45 assembly, 31 BASIC-language, 57 routing, 133 total. See the tabl
 | Detokenisation | The prerequisite for all round-trip work |
 | Round-trip disk development | Import, diff, update, watcher |
 | Published JSON Schema for `ti99.json` | Placed at **early P1**, see the prioritised list for the reasoning |
-| Build profiles, debug and release | See open decision D3 |
+| Build profiles, debug and release | **Future, retained not superseded.** Decision D-H |
 | Signature help and semantic tokens for assembly | |
 | Synchronised listing navigation | |
 | Diagnostic report and support bundle | |
@@ -230,15 +235,15 @@ native program
 
 Every valid TI BASIC program is also a valid Extended BASIC program. Extended BASIC can be proven; TI BASIC cannot. Never infer TI BASIC from the absence of Extended BASIC constructs.
 
-### New: BASIC languages are registered without grammars
+### Resolved: BASIC languages are registered without grammars
 
 `ti-basic` and `ti-extended-basic` are registered language IDs with a language configuration, and neither has a TextMate grammar. A `.b99` file opens as unstyled text under a TI language mode. The extension claims the file type and provides nothing visible.
 
-### New: Show Memory Map exposes the symbol table
+### Resolved: Show Memory Map exposed the symbol table
 
 The command loads the `.equ` symbol file and focuses the Symbols view. Requirement 29.2 asks for address ranges, segments, reserved regions and overlap detection, and that model does not exist. The command name promises the requirement and delivers something else. **Not changed during this documentation pass.** See open decision D2.
 
-### New: the development machine has a patched xdt99
+### Resolved: the development machine has a patched xdt99
 
 A local patch was applied to `xas99.py` during development for `--embed-xb` payloads over 257 bytes, where a padding calculation goes negative. The backup is `xas99.py.bak-before-embedxb-fix`.
 
@@ -313,6 +318,75 @@ Evidence is asymmetric throughout, per the regression-protected finding above.
 ### D-E. One central action resolver
 
 **Decided and implemented.** The Explorer context menu, the editor menus, the Command Palette and the tree views all resolve through a single service that imports no `vscode` and is unit tested directly. Two surfaces computing their own target lists would drift apart, and the wrong one would be the one nobody tested. A test asserts they cannot diverge.
+
+### D-F. BASIC grammar strategy (PM decision D1, decided)
+
+**Decided.** Keep the `ti-basic` and `ti-extended-basic` language registrations, and ship minimal TextMate grammars for both.
+
+The grammars are **presentation-only**. They exist so a BASIC file visibly looks like a supported language. They are explicitly **not a semantic authority**: the lexer, the future parser and binder, and the metadata database in `src/lang/basic` remain the single sources of truth for syntax and semantics. Detailed semantic rules must not be duplicated into a grammar.
+
+Duplication is minimised by structure rather than by discipline: `source.ti-extended-basic` includes the shared rules from `source.ti-basic` and adds only what Extended BASIC adds, which is `::`, `!` comments, `SUB` declarations and the Extended BASIC keyword and function vocabulary.
+
+`.bas` is claimed by neither grammar, preserving dialect neutrality through the resolver rather than by silently assigning a dialect.
+
+**Status: Implemented.** `syntaxes/ti-basic.tmLanguage.json`, `syntaxes/ti-extended-basic.tmLanguage.json`, 11 manifest validation tests including a guard that every registered language has a grammar.
+
+### D-G. Show Memory Map (PM decision D2, decided)
+
+**Decided.** The operation loads the symbol table and never produced a memory map, so the user-visible command is now **`TI-99: Show Symbols`**.
+
+The canonical command id is `ti99.showSymbols`. The old id `ti99.showMemoryMap` **remains registered as a compatibility alias** invoking the same behaviour, so an existing keybinding or programmatic invocation does not break. The alias is hidden from the Command Palette by a `when: false` entry, because it must not continue to be offered under a name that describes something the product does not do.
+
+Requirement 29.2, the real memory-map model, **remains Not Implemented and future.** It was not built during this iteration.
+
+**Status: Implemented.**
+
+### D-H. Build Profiles (PM decision D3, decided)
+
+**Decided.** Build Profiles remain a valid **future** requirement and are **not superseded** by targets. The two are different concepts:
+
+- A **target** answers *what* is being built: Cartridge, E/A Option 3, E/A Option 5, E/A Disk, Extended BASIC loader.
+- A **Build Profile** answers *how* it is being built: Debug, Release, size-optimised, instrumentation enabled, or a future custom profile.
+
+Not implemented during this iteration. `TI-99: Select Build Profile` stays deferred until Build Profiles exist.
+
+### D-I. Project wizard scope (PM decision D4, decided)
+
+**Decided.** The full ten-question guided wizard is **not** required for Phase 1.
+
+Phase 1 requires a **language-aware template and project creation flow** able to create TMS9900 Assembly, TI BASIC and TI Extended BASIC projects. The richer guided wizard remains wanted but must not block BASIC becoming an executable first-class language.
+
+Recorded as: *language-aware template wizard during Phase 1; full guided project wizard in a later enhancement phase.*
+
+The language choice was **not** implemented during this P0 iteration. It belongs with BASIC-primary project support, where it is neither trivial nor isolated.
+
+### D-J. Missing commands (PM decision D5, decided)
+
+**Decided.** These remain valid requirements: `Build Active File`, `Stop Emulator`, `Show Symbols`, `Reveal Build Artifact`. `Select Build Profile` stays deferred with Build Profiles per D-H.
+
+`Show Symbols` was implemented during this iteration as required by D-G. The other three were not, and remain on the roadmap at P2.
+
+### D-K. Error model (PM decision D6, decided)
+
+**Decided.** The exact `Ti99ExtensionError` class and prescribed code enum of requirement 42 are **superseded as an implementation requirement**.
+
+The product requirement is **structured, actionable errors where structure provides value**, supporting, where useful: stable error or category identity, a user-facing message, technical details, a corrective action, and the underlying cause.
+
+Existing actionable error handling is acceptable. The error system was not refactored during this iteration. The embed-xb diagnostic uses the existing architecture and supplies message, detail, cause and corrective action.
+
+### D-L. Archived original specification (PM decision D7, decided)
+
+**Decided.** The original assembly specification is archived at `docs/archive/requirements-assembly-original.md`, carrying a prominent notice that it is historical reference only and superseded by this document.
+
+**This document is the single authoritative current requirements specification.** The README links here, and the previously stale link in `docs/reconstruction.md` was retargeted.
+
+### D-M. Cross-platform verification (PM decision D8, decided)
+
+**Decided.** macOS and Linux verification **does not block Phase 1 development**. Windows remains the development and fully verified platform.
+
+Cross-platform verification **does gate the first production Marketplace release** that advertises Windows, macOS and Linux support. Before that release, smoke testing is required on all three, covering at minimum: installation, project creation, Python and xdt99 detection, native build, packaging, and any emulator integration claimed on that platform.
+
+Not performed during this iteration.
 
 ---
 
@@ -401,13 +475,23 @@ A phase is not complete because the resolver or the UI exists. End-to-end native
 
 ## P0 - correctness and product integrity
 
-Each of these is a place where the product currently claims more than it delivers. All are small.
+**All three resolved on 2026-08-20.** Retained here with their outcomes because each recorded a place where the product claimed more than it delivered.
 
-**P0-1. BASIC and Extended BASIC syntax grammars.** The language IDs are registered without TextMate grammars, so `.b99` and `.xb99` files open as unstyled text under a TI language mode. Either ship grammars or unregister the languages until the parser lands. See open decision D1 for the strategy choice.
+**P0-1. BASIC and Extended BASIC TextMate grammars. RESOLVED.** Presentation-only grammars now ship for both languages, structured so Extended BASIC includes the shared TI BASIC rules rather than copying them. `.b99`, `.xb99` and `.xb` files are visibly highlighted. `.bas` remains unclaimed. A test now fails if any registered language lacks a grammar, so the gap cannot silently reappear. See decision D-F.
 
-**P0-2. Show Memory Map mismatch.** The command exposes the symbol table rather than the memory-map model of requirement 29.2. The requirement itself is Not Implemented. Not changed during this documentation pass. See open decision D2.
+**P0-2. Show Memory Map mismatch. RESOLVED.** The command is now `TI-99: Show Symbols`, with `ti99.showMemoryMap` retained as a hidden compatibility alias. Requirement 29.2 remains Not Implemented and future; nothing advertises it. See decision D-G.
 
-**P0-3. embed-xb compatibility detection and diagnostics.** A user with stock xdt99 3.6.5 may produce an invalid `xb-loader` artifact with no diagnostic, because the development machine carries a local patch the user does not have. Detect the incompatible version or behaviour and produce an actionable message. Do not patch the user installation.
+**P0-3. embed-xb compatibility. RESOLVED, and the risk was mischaracterised.**
+
+The earlier record said a stock installation might produce a corrupt artifact without a diagnostic. **Running a stock installation disproved that.** The observed behaviour:
+
+- xdt99 3.6.5 and earlier compute the loader padding as `256 - size + 1`, which goes negative once assembled code passes **257 bytes**. Python raises `ValueError: negative count`.
+- xas99 then **aborts and writes nothing**. It does not emit a corrupt program. The build already failed; what the user saw was an unexplained Python traceback.
+- Below the threshold, stock and fixed installations produce **byte-identical** output, so the fix is a no-op for small programs and there is no divergence risk.
+
+The real defect was therefore **diagnostic quality**, not data corruption. That is a smaller problem than recorded, and it was still worth fixing, because an unexplained traceback on the one distribution route aimed at users without an Editor/Assembler cartridge is a bad place to lose someone.
+
+Implemented as a capability probe rather than a version check: the extension assembles a 258-byte program with `--embed-xb` once per session and classifies the result. An affected installation blocks the build before any work, with a message naming the affected capability, the detected behaviour, why the loader cannot be built, that the user installation was not modified, and what is required. A raw failure is translated the same way as a backstop when the probe is inconclusive. The extension never modifies a user installation. See `src/toolchain/embedxb.ts`, 14 tests modelling both stock and fixed behaviour including a live boundary check against a real stock xdt99.
 
 ## P1 - make TI BASIC and Extended BASIC genuine first-class executable languages
 
@@ -1256,9 +1340,9 @@ These are **indicative research only, not authoritative community statistics.** 
 
 ## Current test status
 
-**133 passing, 0 failing, 0 skipped.** Lint clean, types clean, VSIX packages at 54 files with no test fixtures included.
+**158 passing, 0 failing, 0 skipped.** Lint clean, types clean, VSIX packages cleanly with no test fixtures included.
 
-Composition: 45 assembly, 31 BASIC-language, 57 routing.
+Composition: 56 assembly and packaging, 31 BASIC-language, 57 routing, 14 toolchain compatibility.
 
 ## What is genuinely complete
 
@@ -1285,11 +1369,11 @@ Composition: 45 assembly, 31 BASIC-language, 57 routing.
 
 ## P0 blockers
 
-1. **BASIC and Extended BASIC TextMate grammars.** Languages are registered without them, so BASIC files open as unstyled text under a TI language mode.
-2. **Show Memory Map mismatch.** The command exposes the symbol table; the requirement 29.2 model does not exist.
-3. **embed-xb compatibility detection.** A stock xdt99 3.6.5 user may produce a corrupt `xb-loader` artifact with no diagnostic, because the development machine carries a patch they do not have.
+**None. All three were resolved on 2026-08-20.**
 
-All three are places where the product claims more than it delivers. All three are small.
+1. **BASIC grammars** - shipped, presentation-only, with a test preventing recurrence.
+2. **Show Memory Map** - renamed to Show Symbols, old command id retained as a hidden alias.
+3. **embed-xb compatibility** - capability probe blocks an affected installation with an actionable diagnostic, and never modifies the user toolchain. The underlying risk was also found to be smaller than recorded: stock xdt99 fails hard and writes nothing rather than emitting a corrupt artifact.
 
 ## Next logical implementation milestone
 
@@ -1299,21 +1383,16 @@ Those two unlock validation, the five BASIC targets, Run, Build and Run, and eve
 
 ## Open product decisions requiring PM input
 
-**D1. BASIC grammar strategy.** Ship hand-written TextMate grammars now, or unregister the BASIC language IDs until the parser can drive semantic highlighting? Grammars are quick and fix the visible gap immediately, but a hand-written grammar will duplicate knowledge the lexer already holds and the two can drift. Unregistering is honest but removes the language identity that routing depends on. **Recommendation: ship minimal grammars now, and treat them as presentation-only, with the lexer remaining the single source of truth for semantics.**
+**D1 through D8 were decided by PM on 2026-08-20** and are recorded in the Product Decisions Register as D-F through D-M. Nothing from that set remains open.
 
-**D2. Show Memory Map.** Rename the command to `Show Symbols` and leave requirement 29.2 unimplemented, or build the memory-map model? Renaming is honest and cheap, but the command shipped in 0.2.0 and a rename breaks any keybinding or task referencing it. **Not decided; not changed during this pass.**
+**No new product decisions were opened by this iteration.**
 
-**D3. Build profiles.** Requirement 12 specifies named debug and release profiles with per-profile defines and output settings. None exists, and targets serve a different purpose. Is this still wanted, or superseded by targets?
+One factual correction was made without needing a decision, because it narrowed a risk rather than changing scope: the embed-xb defect causes a hard failure with no artifact, not a corrupt artifact. See P0-3.
 
-**D4. Project wizard scope.** The wizard currently creates one multi-target assembly project without asking the ten specified questions. Phase 1 needs BASIC project creation. Should the full question flow be built, or should the wizard stay template-driven with a language choice added?
+Two items previously listed as decisions are now simply scheduled work, and need no further PM input unless priorities change:
 
-**D5. Missing commands from requirement 15.** Build Active File, Stop Emulator, Select Build Profile, Show Symbols and Reveal Build Artifact are specified and absent. Which are still wanted? Stop Emulator and Show Symbols look genuinely useful; Select Build Profile depends on D3.
-
-**D6. Formal error model.** Requirement 42 specifies a `Ti99ExtensionError` interface with a code enum. The implementation produces actionable messages without the formal structure. Adopt the formal model, or record it as superseded?
-
-**D7. Status of `docs/requirements.md`.** The original 46-section specification remains in the repository at 2804 lines and now conflicts with this document in places, most visibly on the project filename and assembly extensions. Archive it, mark it superseded, or delete it?
-
-**D8. Cross-platform verification.** macOS and Linux have never been executed. When should that be scheduled, and does it gate the Marketplace publish?
+- The language-aware project creation flow lands with BASIC-primary project support in Phase 1, per D-I.
+- `Build Active File`, `Stop Emulator` and `Reveal Build Artifact` sit at P2, per D-J.
 
 ## Requirements implemented intentionally differently
 

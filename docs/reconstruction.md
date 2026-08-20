@@ -11,7 +11,7 @@ Bin. Only the build outputs survived.
 |---|---|
 | Installed extension, compiled `out/*.js` | `%USERPROFILE%\.vscode\extensions\your-publisher-id.ti99-dev-suite-0.1.2` |
 | Packaged builds 0.1.0 / 0.1.1 / 0.1.2 | `%USERPROFILE%\Downloads\*.vsix` |
-| Design docs | [requirements.md](requirements.md), [deep-dive.md](deep-dive.md) |
+| Design docs | [requirements-master.md](requirements-master.md), [deep-dive.md](deep-dive.md) |
 
 That first folder no longer exists. 0.1.2 was packaged while `publisher` still
 said `your-publisher-id`, so that was the identity it installed under; setting

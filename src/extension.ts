@@ -939,7 +939,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
     register('ti99.detectDialect', doDetectDialect);
     register('ti99.checkHazards', doCheckHazards);
     register('ti99.showListing', doShowListing);
-    register('ti99.showMemoryMap', doShowMemoryMap);
+    // The operation loads the symbol table. It never produced a memory map,
+    // so the canonical name says what it does. The old id stays registered as
+    // a compatibility alias so an existing keybinding does not simply break,
+    // and is hidden from the Command Palette by a when:false menu entry.
+    register('ti99.showSymbols', doShowSymbols);
+    register('ti99.showMemoryMap', doShowSymbols);
     register('ti99.showDiskCatalog', doShowDiskCatalog);
     register('ti99.exportToHardware', doExportToHardware);
 
@@ -1314,7 +1319,7 @@ async function doShowListing(): Promise<void> {
     await vscode.window.showTextDocument(doc, { preview: true });
 }
 
-async function doShowMemoryMap(): Promise<void> {
+async function doShowSymbols(): Promise<void> {
     const project = await projects.require();
     if (!project) return;
 

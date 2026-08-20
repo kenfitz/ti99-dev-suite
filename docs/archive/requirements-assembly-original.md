@@ -1,3 +1,18 @@
+> **ARCHIVED - HISTORICAL REFERENCE ONLY**
+>
+> This is the original Assembly-focused specification. It is **superseded by
+> [`docs/requirements-master.md`](../requirements-master.md)**, which is the
+> single authoritative current requirements specification for this product.
+>
+> Where the two disagree, the master document wins. Two known differences:
+> the project configuration file is `ti99.json`, not `ti99-project.json`; and
+> assembly claims `.a99` and `.asm` only, not `.s`, `.inc` or `.equ`.
+>
+> Kept because it records the original intent and the reasoning behind the
+> assembly design. Do not treat anything here as current requirements.
+
+---
+
 # TI-99/4A Development Suite for Visual Studio Code
 
 ## Product and Technical Requirements Specification

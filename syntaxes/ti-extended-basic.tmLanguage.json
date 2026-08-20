@@ -1,0 +1,64 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "TI Extended BASIC",
+    "scopeName": "source.ti-extended-basic",
+    "_comment": "Presentation only, and deliberately thin. Everything TI BASIC has is included from source.ti-basic rather than copied, so the shared vocabulary lives in one file. Only what Extended BASIC adds appears below. This grammar is not a semantic authority; the lexer, parser and metadata database in src/lang/basic decide what anything means, including which dialect a construct belongs to.",
+    "patterns": [
+        { "include": "#comment-bang" },
+        { "include": "#comment-rem" },
+        { "include": "#line-number" },
+        { "include": "#data-statement" },
+        { "include": "#image-statement" },
+        { "include": "#string" },
+        { "include": "#statement-separator" },
+        { "include": "#call-subprogram" },
+        { "include": "#sub-declaration" },
+        { "include": "#extended-keyword" },
+        { "include": "#statement-keyword" },
+        { "include": "#extended-function" },
+        { "include": "#builtin-function" },
+        { "include": "#number" },
+        { "include": "#operator" },
+        { "include": "#punctuation" },
+        { "include": "#variable" }
+    ],
+    "repository": {
+        "comment-bang": {
+            "_comment": "Extended BASIC only. Runs to end of line.",
+            "name": "comment.line.bang.ti-extended-basic",
+            "match": "!.*$"
+        },
+        "statement-separator": {
+            "_comment": "Extended BASIC only. One token, not two colons.",
+            "name": "punctuation.separator.statement.ti-extended-basic",
+            "match": "::"
+        },
+        "sub-declaration": {
+            "match": "(?i)\\b(SUB)\\s+([A-Z][A-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "storage.type.sub.ti-extended-basic" },
+                "2": { "name": "entity.name.function.sub.ti-extended-basic" }
+            }
+        },
+        "extended-keyword": {
+            "name": "keyword.control.ti-extended-basic",
+            "match": "(?i)\\b(ACCEPT|ALL|APPEND|AT|BEEP|DELETE|DISPLAY|ERASE|ERROR|FIXED|INTERNAL|LINPUT|OUTPUT|PERMANENT|RELATIVE|RUN|SEQUENTIAL|SIZE|SUBEND|SUBEXIT|UPDATE|USING|VALIDATE|VARIABLE|WARNING)\\b"
+        },
+        "extended-function": {
+            "name": "support.function.ti-extended-basic",
+            "match": "(?i)\\b(MAX|MIN|PI|RPT\\$)(?=\\s*\\(|\\b)"
+        },
+        "comment-rem": { "include": "source.ti-basic#comment-rem" },
+        "line-number": { "include": "source.ti-basic#line-number" },
+        "data-statement": { "include": "source.ti-basic#data-statement" },
+        "image-statement": { "include": "source.ti-basic#image-statement" },
+        "string": { "include": "source.ti-basic#string" },
+        "call-subprogram": { "include": "source.ti-basic#call-subprogram" },
+        "statement-keyword": { "include": "source.ti-basic#statement-keyword" },
+        "builtin-function": { "include": "source.ti-basic#builtin-function" },
+        "number": { "include": "source.ti-basic#number" },
+        "operator": { "include": "source.ti-basic#operator" },
+        "punctuation": { "include": "source.ti-basic#punctuation" },
+        "variable": { "include": "source.ti-basic#variable" }
+    }
+}

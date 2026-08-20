@@ -181,3 +181,106 @@ test('every setting a profile requires is settable per folder', () => {
     }
   }
 });
+
+// Grammars and the Show Symbols rename, checked against the manifest.
+//
+// These are packaging guards. A grammar that is written but not contributed,
+// or contributed under the wrong scope, is invisible in exactly the way the
+// missing grammars were before this iteration.
+
+test("every registered language has a grammar", () => {
+    const langs = pkg.contributes.languages.map(l => l.id);
+    const withGrammar = new Set(pkg.contributes.grammars.map(g => g.language));
+    for (const id of langs) {
+        assert.ok(withGrammar.has(id),
+            id + " is registered as a language with no grammar, so its files " +
+            "would open as unstyled text");
+    }
+});
+
+test("BASIC grammars are contributed for the intended language ids", () => {
+    const byLang = Object.fromEntries(pkg.contributes.grammars.map(g => [g.language, g]));
+    assert.strictEqual(byLang["ti-basic"].scopeName, "source.ti-basic");
+    assert.strictEqual(byLang["ti-extended-basic"].scopeName, "source.ti-extended-basic");
+});
+
+test("grammar files exist and are valid JSON with matching scopes", () => {
+    for (const g of pkg.contributes.grammars) {
+        const file = path.join(__dirname, "..", g.path);
+        assert.ok(fs.existsSync(file), g.path + " is contributed but missing");
+        const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+        assert.strictEqual(parsed.scopeName, g.scopeName,
+            g.path + " declares a different scope than the manifest");
+    }
+});
+
+test("the intended extensions reach the intended grammar", () => {
+    const byId = Object.fromEntries(pkg.contributes.languages.map(l => [l.id, l]));
+    assert.deepStrictEqual(byId["ti-basic"].extensions, [".b99"]);
+    assert.deepStrictEqual(byId["ti-extended-basic"].extensions, [".xb99", ".xb"]);
+    assert.deepStrictEqual(byId["tms9900"].extensions, [".a99", ".asm"]);
+});
+
+test(".bas is not claimed by either dialect", () => {
+    // .bas is dialect-neutral. Assigning it to one grammar would silently pick
+    // a dialect the resolver deliberately refuses to guess.
+    for (const l of pkg.contributes.languages) {
+        assert.ok(!(l.extensions || []).includes(".bas"),
+            l.id + " must not claim .bas");
+    }
+});
+
+test("the Extended BASIC grammar reuses TI BASIC rather than copying it", () => {
+    const xb = JSON.parse(fs.readFileSync(
+        path.join(__dirname, "..", "syntaxes", "ti-extended-basic.tmLanguage.json"), "utf8"));
+    const included = Object.values(xb.repository)
+        .filter(r => typeof r.include === "string" && r.include.startsWith("source.ti-basic#"));
+    assert.ok(included.length >= 8,
+        "shared rules should be included from source.ti-basic, not duplicated");
+});
+
+test("the Extended BASIC grammar carries the constructs only it has", () => {
+    const src = fs.readFileSync(
+        path.join(__dirname, "..", "syntaxes", "ti-extended-basic.tmLanguage.json"), "utf8");
+    assert.match(src, /statement-separator/, ":: must be highlighted");
+    assert.match(src, /comment-bang/, "! comments must be highlighted");
+    assert.match(src, /SUBEND/, "Extended BASIC keywords must be present");
+});
+
+test("grammars stay presentation-only", () => {
+    // The lexer, parser and metadata database are the semantic authority. A
+    // grammar that starts encoding dialect or parameter rules will drift from
+    // them, so each one says so in its own header.
+    for (const g of pkg.contributes.grammars) {
+        if (!g.language.startsWith("ti-")) { continue; }
+        const parsed = JSON.parse(fs.readFileSync(path.join(__dirname, "..", g.path), "utf8"));
+        assert.match(parsed._comment, /[Pp]resentation only/,
+            g.language + " grammar must state that it is not a semantic authority");
+    }
+});
+
+test("Show Symbols is the canonical command and the old id still works", () => {
+    const ids = pkg.contributes.commands.map(c => c.command);
+    assert.ok(ids.includes("ti99.showSymbols"), "canonical id must exist");
+    assert.ok(ids.includes("ti99.showMemoryMap"),
+        "old id must stay registered so existing keybindings do not break");
+
+    const canonical = pkg.contributes.commands.find(c => c.command === "ti99.showSymbols");
+    assert.strictEqual(canonical.title, "Show Symbols");
+});
+
+test("the compatibility alias is hidden from the Command Palette", () => {
+    // It never showed a memory map, so it must not be offered under that name.
+    const hidden = (pkg.contributes.menus.commandPalette || [])
+        .find(e => e.command === "ti99.showMemoryMap");
+    assert.ok(hidden, "the alias needs a commandPalette entry");
+    assert.strictEqual(hidden.when, "false");
+});
+
+test("no user-facing text still promises a memory map", () => {
+    const readme = fs.readFileSync(path.join(__dirname, "..", "README.md"), "utf8");
+    const offending = readme.split("\n").filter(l =>
+        /Show Memory Map/.test(l) && !/alias|never produced/.test(l));
+    assert.deepStrictEqual(offending, [],
+        "requirement 29.2 is not implemented, so nothing may advertise it");
+});

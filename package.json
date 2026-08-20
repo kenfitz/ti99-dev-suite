@@ -80,6 +80,16 @@
         "language": "tms9900",
         "scopeName": "source.tms9900",
         "path": "./syntaxes/tms9900.tmLanguage.json"
+      },
+      {
+        "language": "ti-basic",
+        "scopeName": "source.ti-basic",
+        "path": "./syntaxes/ti-basic.tmLanguage.json"
+      },
+      {
+        "language": "ti-extended-basic",
+        "scopeName": "source.ti-extended-basic",
+        "path": "./syntaxes/ti-extended-basic.tmLanguage.json"
       }
     ],
     "snippets": [
@@ -169,8 +179,13 @@
         "category": "TI-99"
       },
       {
+        "command": "ti99.showSymbols",
+        "title": "Show Symbols",
+        "category": "TI-99"
+      },
+      {
         "command": "ti99.showMemoryMap",
-        "title": "Show Memory Map",
+        "title": "Show Symbols (compatibility alias for Show Memory Map)",
         "category": "TI-99"
       },
       {
@@ -321,6 +336,12 @@
           "command": "ti99.showDiskCatalog",
           "when": "resourceExtname == .dsk",
           "group": "4_disk@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ti99.showMemoryMap",
+          "when": "false"
         }
       ]
     },

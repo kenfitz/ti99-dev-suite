@@ -2,9 +2,13 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import * as os from 'os';
 
 import { expandArgs } from '../toolchain/profiles';
 import { run, verifyArtifact } from '../toolchain/runner';
+import {
+    EmbedXbProbe, classifyProbe, decideEmbedXb, explainEmbedXbFailure, probeSource,
+} from '../toolchain/embedxb';
 import type { ToolCommand } from '../toolchain/profiles';
 import type { Cancellation, RunResult } from '../toolchain/runner';
 import type { ToolchainState } from '../toolchain/discovery';
@@ -147,6 +151,23 @@ export class BuildCoordinator {
             this.output.appendLine('');
             this.output.appendLine(`> ${capability}`);
 
+            // The Extended BASIC loader depends on an xas99 option that is
+            // defective in xdt99 3.6.5 and earlier. Probe once and stop here
+            // rather than let the user meet a Python traceback.
+            if (capability === 'xb-program') {
+                const probe = await this.probeEmbedXb(toolchain, effective.root.fsPath, token);
+                const decision = decideEmbedXb(probe);
+                if (decision.detail) { this.output.appendLine(decision.detail); }
+                if (!decision.allowed) {
+                    this.output.appendLine('');
+                    this.output.appendLine(`  ${decision.message}`);
+                    return {
+                        success: false, cancelled: false, artifacts,
+                        diagnostics: allDiagnostics, durationMs: Date.now() - started, steps,
+                    };
+                }
+            }
+
             const result = await run({
                 program,
                 args,
@@ -173,6 +194,11 @@ export class BuildCoordinator {
                 ? verifyArtifact(outputPath)
                 : { ok: false, reason: undefined };
             const ok = result.exitCode === 0 && artifactCheck.ok;
+
+            if (!ok && capability === 'xb-program') {
+                const explanation = explainEmbedXbFailure(result.stderr + result.stdout);
+                if (explanation) { this.output.appendLine(explanation); }
+            }
             steps.push({ capability, result, ok, reason: artifactCheck.reason });
 
             if (!ok) {
@@ -266,6 +292,47 @@ export class BuildCoordinator {
         for (const dir of [project.config.buildDir, project.config.distDir]) {
             fs.mkdirSync(path.resolve(project.root.fsPath, dir), { recursive: true });
         }
+    }
+
+    /**
+     * Ask this xdt99 whether it can embed a program larger than the threshold.
+     *
+     * Runs once per session and caches, because the answer cannot change while
+     * the extension is loaded and the probe costs a process launch. The probe
+     * writes into the build directory and cleans up after itself.
+     */
+    private embedXbProbe: EmbedXbProbe | undefined;
+
+    private async probeEmbedXb(
+        toolchain: ToolchainState, root: string, token?: Cancellation,
+    ): Promise<EmbedXbProbe> {
+        if (this.embedXbProbe) { return this.embedXbProbe; }
+
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ti99-embedxb-'));
+        const source = path.join(dir, 'probe.a99');
+        const artifact = path.join(dir, 'probe.prg');
+        try {
+            fs.writeFileSync(source, probeSource(), 'utf8');
+            const result = await run({
+                program: toolchain.python!.path,
+                args: [
+                    path.join(toolchain.tool!.directory, 'xas99.py'),
+                    '-R', '--embed-xb', source, '-o', artifact,
+                ],
+                cwd: root,
+            }, token);
+            this.embedXbProbe = classifyProbe(
+                result.exitCode, result.stderr + result.stdout, fs.existsSync(artifact));
+        } catch (err) {
+            this.embedXbProbe = {
+                capability: 'unknown',
+                detail: 'The probe could not be run: ' + String(err),
+            };
+        } finally {
+            try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* nothing to clean */ }
+        }
+        this.output.appendLine('  embed-xb support: ' + this.embedXbProbe.capability);
+        return this.embedXbProbe;
     }
 
     private outputPathFor(project: Project, capability: Capability): string {

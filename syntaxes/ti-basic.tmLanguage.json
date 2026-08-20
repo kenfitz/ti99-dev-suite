@@ -1,0 +1,107 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "TI BASIC",
+    "scopeName": "source.ti-basic",
+    "_comment": "Presentation only. This grammar exists so a TI BASIC file looks like a supported language. It is deliberately not a semantic authority: the lexer, parser and metadata database in src/lang/basic decide what anything means. Do not encode dialect rules or parameter rules here. The Extended BASIC grammar includes this one and adds only what Extended BASIC adds.",
+    "patterns": [
+        { "include": "#comment-rem" },
+        { "include": "#line-number" },
+        { "include": "#data-statement" },
+        { "include": "#image-statement" },
+        { "include": "#string" },
+        { "include": "#call-subprogram" },
+        { "include": "#statement-keyword" },
+        { "include": "#builtin-function" },
+        { "include": "#number" },
+        { "include": "#operator" },
+        { "include": "#punctuation" },
+        { "include": "#variable" }
+    ],
+    "repository": {
+        "comment-rem": {
+            "name": "comment.line.rem.ti-basic",
+            "match": "(?i)\\bREM\\b.*$"
+        },
+        "line-number": {
+            "_comment": "Only at the start of a line, where a line number can appear.",
+            "match": "^\\s*([0-9]+)",
+            "captures": {
+                "1": { "name": "entity.name.label.line-number.ti-basic" }
+            }
+        },
+        "data-statement": {
+            "_comment": "Everything after DATA is operand text, quoted or not, so it is coloured as data rather than parsed as code.",
+            "begin": "(?i)\\b(DATA)\\b",
+            "beginCaptures": {
+                "1": { "name": "keyword.control.ti-basic" }
+            },
+            "end": "$",
+            "patterns": [
+                { "include": "#string" },
+                { "match": ",", "name": "punctuation.separator.ti-basic" },
+                { "match": "[^,\"]+", "name": "string.unquoted.data.ti-basic" }
+            ]
+        },
+        "image-statement": {
+            "_comment": "An IMAGE format runs to end of line whether or not it is quoted.",
+            "begin": "(?i)\\b(IMAGE)\\b",
+            "beginCaptures": {
+                "1": { "name": "keyword.control.ti-basic" }
+            },
+            "end": "$",
+            "patterns": [
+                { "match": ".+", "name": "string.unquoted.image.ti-basic" }
+            ]
+        },
+        "string": {
+            "name": "string.quoted.double.ti-basic",
+            "begin": "\"",
+            "end": "\"(?!\")",
+            "patterns": [
+                {
+                    "_comment": "A doubled quote is an escaped quote and continues the string.",
+                    "match": "\"\"",
+                    "name": "constant.character.escape.ti-basic"
+                }
+            ]
+        },
+        "call-subprogram": {
+            "_comment": "The name after CALL. Which names are valid, and in which dialect, is the metadata database's business, not this grammar's.",
+            "match": "(?i)\\b(CALL)\\s+([A-Z][A-Z0-9_]*)",
+            "captures": {
+                "1": { "name": "keyword.control.ti-basic" },
+                "2": { "name": "entity.name.function.subprogram.ti-basic" }
+            }
+        },
+        "statement-keyword": {
+            "name": "keyword.control.ti-basic",
+            "match": "(?i)\\b(BREAK|CLOSE|DEF|DIM|ELSE|END|FOR|GOSUB|GO\\s+TO|GOTO|IF|INPUT|LET|NEXT|ON|OPEN|OPTION|PRINT|RANDOMIZE|READ|RESTORE|RETURN|STEP|STOP|THEN|TO|TRACE|UNBREAK|UNTRACE)\\b"
+        },
+        "builtin-function": {
+            "name": "support.function.ti-basic",
+            "match": "(?i)\\b(ABS|ASC|ATN|CHR\\$|COS|EOF|EXP|INT|LEN|LOG|POS|REC|RND|SEG\\$|SGN|SIN|SQR|STR\\$|TAB|TAN|VAL)(?=\\s*\\(|\\b)"
+        },
+        "number": {
+            "_comment": "Decimal and scientific notation. The exponent sign belongs to the number only when a digit follows.",
+            "name": "constant.numeric.ti-basic",
+            "match": "(?i)\\b[0-9]*\\.?[0-9]+(E[-+]?[0-9]+)?\\b|(?<![\\w.])\\.[0-9]+"
+        },
+        "operator": {
+            "name": "keyword.operator.ti-basic",
+            "match": "(?i)<=|>=|<>|\\bAND\\b|\\bNOT\\b|\\bOR\\b|\\bXOR\\b|[-+*/^=<>&]"
+        },
+        "punctuation": {
+            "patterns": [
+                { "match": "[()]", "name": "meta.brace.round.ti-basic" },
+                { "match": "[,;:#]", "name": "punctuation.separator.ti-basic" }
+            ]
+        },
+        "variable": {
+            "_comment": "A trailing dollar marks a string variable and is part of the name.",
+            "patterns": [
+                { "match": "\\b[A-Za-z][A-Za-z0-9_]*\\$", "name": "variable.other.string.ti-basic" },
+                { "match": "\\b[A-Za-z][A-Za-z0-9_]*", "name": "variable.other.ti-basic" }
+            ]
+        }
+    }
+}

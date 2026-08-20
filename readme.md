@@ -286,7 +286,7 @@ works directly in Classic99, MAME and js99er.
 | TI-99: Check for Dialect Hazards | |
 | TI-99: Show Toolchain Status | |
 | TI-99: Open Build Listing | |
-| TI-99: Show Memory Map | |
+| TI-99: Show Symbols | Load the symbol table from the last build into the Symbols view. The older `ti99.showMemoryMap` command id still works as an alias; it never produced a memory map, and the real memory map remains future work. |
 | TI-99: Show Disk Catalog | |
 | TI-99: Export to Real Hardware | |
 
@@ -374,6 +374,22 @@ output for you to drag in.
   rules out running Python, xdt99 or an emulator.
 
 ---
+
+## Requirements and roadmap
+
+The single authoritative specification for what this product is intended to
+be, and where the implementation currently stands, is
+[docs/requirements-master.md](docs/requirements-master.md). It carries the
+requirements, the implementation status, the product decisions and the phased
+roadmap.
+
+Supporting documents: [the implementation audit](docs/audit-2026-08-20.md),
+[the BASIC design report](docs/basic-support-design.md), and
+[the source naming convention](docs/source-naming.md).
+
+The original assembly-only specification is archived at
+[docs/archive/requirements-assembly-original.md](docs/archive/requirements-assembly-original.md)
+and is historical reference only.
 
 ## Project status
 

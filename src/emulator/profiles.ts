@@ -48,6 +48,14 @@ export interface EmulatorProfile {
      * clear message about what to configure.
      */
     requires?: string[];
+    /**
+     * Shown after a successful launch. A cartridge boots straight into the
+     * program, but a loader cartridge drops the user at a menu, and without
+     * being told which option to choose and what filename to type, a working
+     * launch is indistinguishable from a broken one. Supports the same
+     * substitutions as args.
+     */
+    hint?: string;
     notes?: string;
 }
 
@@ -106,6 +114,8 @@ export const CLASSIC99_EA: EmulatorProfile = {
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99EaRom', 'ti99.emulator.classic99Dsk1'],
+    hint: 'Editor/Assembler loaded. Press any key, choose 2 for EDITOR/ASSEMBLER, ' +
+        'then 5 (RUN PROGRAM FILE) and enter DSK1.${tiFilename} - it starts by itself.',
     notes: 'Loads the Editor/Assembler cartridge and drops the build into DSK1. ' +
         'Choose option 5 for a memory image or option 3 for a tagged object, then ' +
         'the program name from DEF. Cartridge ROMs are not distributed with the ' +
@@ -128,6 +138,8 @@ export const CLASSIC99_XB: EmulatorProfile = {
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
+    hint: 'Extended BASIC loaded. It runs DSK1.LOAD at power-up, so the program ' +
+        'should start on its own. If it does not, type RUN "DSK1.LOAD".',
     notes: 'Loads Extended BASIC and drops the build plus its LOAD program into ' +
         'DSK1. XB runs a program called LOAD at power-up, so the game starts by ' +
         'itself. Cartridge ROMs are not distributed with the extension.',

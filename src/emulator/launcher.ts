@@ -190,6 +190,11 @@ export class EmulatorLauncher implements vscode.Disposable {
             });
             child.unref();
             this.running.set(profile.id, child);
+            if (profile.hint) {
+                const hint = resolve(profile.hint);
+                this.output.appendLine(`  ${hint}`);
+                void vscode.window.showInformationMessage(`TI-99: ${hint}`);
+            }
             child.on('error', err => {
                 void vscode.window.showErrorMessage(`${profile.displayName} failed to start: ${err.message}`);
             });

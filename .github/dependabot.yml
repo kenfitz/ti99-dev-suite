@@ -20,6 +20,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Major bumps of the compiler or the linter change behaviour and should be
+    # a deliberate act, not an automated pull request that fails CI on arrival.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Keep the CI actions current; these are the only third-party code that runs
   # with repository credentials.
@@ -36,3 +41,6 @@ updates:
       actions:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"

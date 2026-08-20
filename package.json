@@ -492,7 +492,7 @@
     "check-types": "tsc --noEmit -p ./",
     "lint": "eslint .",
     "pretest": "npm run compile",
-    "test": "node --test \"test/**/*.test.js\"",
+    "test": "node --test",
     "package": "vsce package",
     "publish": "vsce publish"
   },

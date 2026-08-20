@@ -6,7 +6,7 @@ Working on the extension itself. For using it, see the
 
 ## Setup
 
-Requires Node 20 or newer and Python 3.8+ with
+Requires Node 22 or newer and Python 3.8+ with
 [xdt99](https://github.com/endlos99/xdt99) if you want to build TI projects.
 
 ```

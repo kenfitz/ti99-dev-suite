@@ -104,13 +104,31 @@ documentation into our metadata; it cannot be inferred from the tokenizer.
 detectable and reversible. Surface it as metadata, support producing it, and
 say plainly that it is not security.
 
-### 1.9 Auto-run LOAD — one experiment outstanding
+### 1.9 Auto-run LOAD — resolved by experiment
 
-Verified: an `INT/VAR 254` long-format program named LOAD does **not** auto-run;
-`RUN "DSK1.LOAD"` is required. That is the current XB assembly disk.
+**Result: a standard-format PROGRAM named LOAD auto-loads and auto-runs.**
 
-Unverified: whether a *standard-format* `PROGRAM` named LOAD auto-runs at
-startup. This is the one experiment that must precede designing requirement 21.
+Method: `100 CALL CLEAR / 110 PRINT "AUTO RUN WORKED" / 120 GOTO 120`,
+tokenized with `xbas99 -c` and confirmed standard format by its header — no
+`>ABCD` marker, top of program `>37D7`. Placed on DSK1 as file type PROGRAM
+named LOAD. Classic99 started cold with the Extended BASIC cartridge, Extended
+BASIC selected, nothing typed. The program ran by itself. Repeated from a full
+cold restart with the same result.
+
+The format is what decides it:
+
+| Format | Stored as | Named LOAD on DSK1 |
+|---|---|---|
+| Standard | `PROGRAM` | **auto-loads and runs** |
+| Long | `INT/VAR 254` | ignored; `RUN "DSK1.LOAD"` required |
+
+That resolves requirement 21 and explains the earlier assembly result. The
+`--embed-xb` disk is long format, which is why it needed an explicit RUN. A
+BASIC program tokenized normally is standard format and does not.
+
+It also applies to the assembly XB route: its loader is produced by
+`xbas99 -c` without `-L`, so it is already standard format and already
+auto-runs. The instruction to type RUN was unnecessary.
 
 ### 1.10 Other verified constraints
 

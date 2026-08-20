@@ -201,9 +201,11 @@ export const CLASSIC99_XB_DISK: EmulatorProfile = {
     detached: true,
     platforms: ['win32'],
     requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
-    hint: 'Extended BASIC loaded. Type  RUN "DSK1.${basicName}"  and wait — the ' +
-        'whole game travels inside the BASIC program, so it takes about a ' +
-        'minute before the title screen appears.',
+    // A standard-format PROGRAM named LOAD on DSK1 auto-loads and auto-runs;
+    // verified on a cold Classic99 start. Only the long INT/VAR 254 format
+    // needs an explicit RUN, which is why the assembly disk used to.
+    hint: 'Extended BASIC loaded. DSK1.${basicName} starts on its own — give it ' +
+        'a moment. If nothing happens, type  RUN "DSK1.${basicName}"',
     notes: 'The game is embedded in the Extended BASIC program, so the Editor/' +
         'Assembler cartridge is not required. The .dsk in distDir is the ' +
         'distribution artifact; the staged copy is for testing.',

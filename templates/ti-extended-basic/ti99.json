@@ -1,0 +1,72 @@
+{
+    "$schema": "./.ti99/ti99.schema.json",
+    "name": "{{NAME}}",
+    "language": "ti-extended-basic",
+    "entrySource": "src/main.xb99",
+    "sources": [
+        "src/main.xb99"
+    ],
+    "outputs": [
+        "basic-program"
+    ],
+    "buildDir": "build",
+    "distDir": "dist",
+    "basicName": "{{TINAME}}",
+    "tiName": "{{TINAME}}",
+    "basicFormat": "standard",
+    "defaultTarget": "program",
+    "targets": [
+        {
+            "id": "program",
+            "label": "Program",
+            "description": "Tokenised program, dropped into DSK1 to run.",
+            "outputs": [
+                "basic-program"
+            ],
+            "emulatorProfile": "classic99-xb-program"
+        },
+        {
+            "id": "disk",
+            "label": "Disk",
+            "description": "A disk image holding the program, for a real drive or an emulator.",
+            "outputs": [
+                "basic-program",
+                "disk-image"
+            ],
+            "emulatorProfile": "classic99-disk",
+            "disk": {
+                "geometry": "sssd",
+                "volumeName": "{{TINAME}}",
+                "files": [
+                    {
+                        "artifact": "basic-program",
+                        "tiName": "{{TINAME}}",
+                        "format": "PROGRAM"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "autorun-disk",
+            "label": "Auto-Run Disk",
+            "description": "A disk whose program is named LOAD, which Extended BASIC starts by itself.",
+            "outputs": [
+                "basic-program",
+                "disk-image"
+            ],
+            "emulatorProfile": "classic99-xbdisk",
+            "basicName": "LOAD",
+            "disk": {
+                "geometry": "sssd",
+                "volumeName": "{{TINAME}}",
+                "files": [
+                    {
+                        "artifact": "basic-program",
+                        "tiName": "LOAD",
+                        "format": "PROGRAM"
+                    }
+                ]
+            }
+        }
+    ]
+}

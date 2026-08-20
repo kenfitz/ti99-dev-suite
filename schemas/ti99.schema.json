@@ -1,0 +1,313 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TI-99/4A project",
+  "description": "Configuration for a TI-99/4A Development Suite project. Deliberately no stricter than the loader: every property the loader accepts is described here, and nothing is required that the loader tolerates.",
+  "type": "object",
+  "required": [
+    "name",
+    "sources"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "description": "Configuration format version."
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name. Also the default artifact stem."
+    },
+    "language": {
+      "description": "Primary source language. Declares intent, so it outranks the file extension: a .b99 file in an Extended BASIC project is Extended BASIC.",
+      "enum": [
+        "tms9900",
+        "ti-basic",
+        "ti-extended-basic",
+        "gpl"
+      ]
+    },
+    "entrySource": {
+      "type": "string",
+      "description": "The source that drives the build."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "includePaths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "defines": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Build capabilities to produce.",
+      "items": {
+        "enum": [
+          "assemble",
+          "link",
+          "listing",
+          "symbols",
+          "cart-rpk",
+          "cart-bin",
+          "ea3-object",
+          "ea5-image",
+          "disk-image",
+          "tifiles",
+          "basic-program",
+          "basic-tifiles",
+          "xb-program",
+          "ea3-tifiles",
+          "xb-tifiles"
+        ]
+      }
+    },
+    "buildDir": {
+      "type": "string",
+      "default": "build"
+    },
+    "distDir": {
+      "type": "string",
+      "default": "dist"
+    },
+    "syntaxDialect": {
+      "enum": [
+        "ea",
+        "xdt99",
+        "relaxed"
+      ],
+      "description": "Assembly source dialect. ea is strict Editor/Assembler."
+    },
+    "processor": {
+      "enum": [
+        "9900",
+        "9995",
+        "99000",
+        "f18a"
+      ]
+    },
+    "registerSymbols": {
+      "type": "boolean"
+    },
+    "basicSource": {
+      "type": "string",
+      "description": "BASIC source to tokenise. Only needed when the project is not itself a BASIC project, such as an assembly disk whose loader is written in Extended BASIC."
+    },
+    "basicName": {
+      "type": "string",
+      "description": "TI filename for the tokenised program. LOAD makes Extended BASIC auto-run it."
+    },
+    "basicFormat": {
+      "enum": [
+        "standard",
+        "long"
+      ],
+      "default": "standard",
+      "description": "Native program format. Standard loads on an unexpanded console and is what Extended BASIC auto-runs from DSK1.LOAD. Long needs the 32K expansion and does not auto-run, so choose it only when required."
+    },
+    "tiName": {
+      "type": "string",
+      "description": "TI filename used when staging into a FIAD directory."
+    },
+    "defaultTarget": {
+      "type": "string"
+    },
+    "sourceDefaults": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "cartridge": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "baseAddress": {
+          "type": "string"
+        },
+        "banking": {
+          "enum": [
+            "none",
+            "378",
+            "379",
+            "grom"
+          ]
+        },
+        "binFilename": {
+          "type": "string"
+        }
+      }
+    },
+    "disk": {
+      "type": "object",
+      "properties": {
+        "geometry": {
+          "type": "string"
+        },
+        "volumeName": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "artifact",
+              "tiName",
+              "format"
+            ],
+            "properties": {
+              "artifact": {
+                "type": "string"
+              },
+              "tiName": {
+                "type": "string"
+              },
+              "format": {
+                "type": "string",
+                "examples": [
+                  "PROGRAM",
+                  "DIS/FIX 80",
+                  "INT/VAR 254"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "emulatorProfile": {
+      "type": "string"
+    },
+    "assembler": {
+      "type": "object",
+      "properties": {
+        "unresolvedReferencePolicy": {
+          "enum": [
+            "ignore",
+            "information",
+            "warning",
+            "error"
+          ]
+        },
+        "extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "description": "Distribution routes. Each merges onto the project settings.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "tms9900",
+              "ti-basic",
+              "ti-extended-basic",
+              "gpl"
+            ]
+          },
+          "entrySource": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "emulatorProfile": {
+            "type": "string"
+          },
+          "basicSource": {
+            "type": "string"
+          },
+          "basicName": {
+            "type": "string"
+          },
+          "tiName": {
+            "type": "string"
+          },
+          "buildDir": {
+            "type": "string"
+          },
+          "distDir": {
+            "type": "string"
+          },
+          "cartridge": {
+            "type": "object"
+          },
+          "disk": {
+            "type": "object"
+          },
+          "type": {
+            "enum": [
+              "cartridge-rpk",
+              "cartridge-bin",
+              "ea5-image",
+              "ea3-object",
+              "disk"
+            ]
+          }
+        }
+      }
+    },
+    "type": {
+      "description": "Project type, kept for compatibility with earlier projects. Targets and outputs carry this information now.",
+      "enum": [
+        "cartridge-rpk",
+        "cartridge-bin",
+        "ea5-image",
+        "ea3-object",
+        "disk"
+      ]
+    },
+    "toolchainProfile": {
+      "type": "string",
+      "description": "Toolchain profile id, when the project does not use the default."
+    }
+  }
+}

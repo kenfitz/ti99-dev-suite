@@ -15,7 +15,8 @@ import type { ToolchainState } from '../toolchain/discovery';
 import { parseXas99, parseXdm99 } from './diagnostics';
 import type { ParsedDiagnostic } from './diagnostics';
 import { DIALECTS } from '../lang/dialect';
-import { resolveTarget } from '../config/project';
+import { basicSourceOf, isBasicProject, resolveTarget } from '../config/project';
+import { describeForBuildLog, describeProgram } from '../lang/basic/format';
 import type { Project } from '../config/loader';
 import type { Capability, UnresolvedPolicy } from '../config/project';
 
@@ -195,6 +196,19 @@ export class BuildCoordinator {
                 : { ok: false, reason: undefined };
             const ok = result.exitCode === 0 && artifactCheck.ok;
 
+            if (ok && capability === 'basic-program') {
+                // Measured from the artifact rather than inferred from the
+                // flags, because the format decides which machine the program
+                // will actually load on.
+                try {
+                    const info = describeProgram(new Uint8Array(fs.readFileSync(outputPath)));
+                    if (info) { this.output.appendLine('  ' + describeForBuildLog(info)); }
+                } catch {
+                    // Reporting the format is a courtesy; failing to read it
+                    // back must not fail a build that otherwise succeeded.
+                }
+            }
+
             if (!ok && capability === 'xb-program') {
                 const explanation = explainEmbedXbFailure(result.stderr + result.stdout);
                 if (explanation) { this.output.appendLine(explanation); }
@@ -355,7 +369,14 @@ export class BuildCoordinator {
             case 'disk-image': return path.join(dist, `${stem}.dsk`);
             // Extended BASIC runs a program called LOAD from DSK1 at power-up,
             // so that is the default name a boot disk wants.
-            case 'basic-program': return path.join(build, config.basicName ?? 'LOAD');
+            case 'basic-program':
+                // For a BASIC project the tokenised program is the product, so
+                // it goes to dist under its TI name. For an assembly project it
+                // is the loader component of an Extended BASIC disk, which the
+                // disk step picks up out of the build directory.
+                return isBasicProject(config)
+                    ? path.join(dist, config.tiName ?? config.basicName ?? tiStem)
+                    : path.join(build, config.basicName ?? 'LOAD');
             case 'basic-tifiles': return path.join(dist, config.basicName ?? 'LOAD');
             // Extended BASIC runs a program called LOAD from DSK1 at power-up.
             case 'xb-program': return path.join(dist, config.basicName ?? 'LOAD');
@@ -395,7 +416,7 @@ export class BuildCoordinator {
 
         const inputPath =
             capability === 'basic-program'
-                ? (config.basicSource ? path.resolve(root, config.basicSource) : '')
+                ? (basicSourceOf(config) ? path.resolve(root, basicSourceOf(config)!) : '')
                 : capability === 'basic-tifiles'
                     ? this.outputPathFor(project, 'basic-program')
                 : capability === 'ea3-tifiles'
@@ -423,6 +444,7 @@ export class BuildCoordinator {
             dialectFlag: DIALECTS[config.syntaxDialect].assemblerFlag,
             registerFlag: pick('registerFlag', String(config.registerSymbols)),
             cpuFlag: pick('cpuFlag', config.processor),
+            basicFormatFlag: pick('basicFormatFlag', config.basicFormat ?? 'standard'),
             cartBase: config.cartridge?.baseAddress ?? '>6000',
             cartridgeName: config.cartridge?.name ?? config.name,
             diskGeometry: config.disk?.geometry ?? 'sssd',

@@ -94,6 +94,15 @@ export interface ProjectConfig {
     defaultTarget?: string;
     /** Per-source default targets, keyed by project-relative path. */
     sourceDefaults?: Record<string, string>;
+    /**
+     * Native program format for a BASIC build.
+     *
+     * Standard is the default and is preferred whenever the program fits: it
+     * loads on an unexpanded console and it is the format Extended BASIC will
+     * auto-run from DSK1.LOAD. Long format needs 32K and does not auto-run, so
+     * it is used only when asked for.
+     */
+    basicFormat?: 'standard' | 'long';
 }
 /**
  * One distribution route.
@@ -130,6 +139,24 @@ export interface TargetConfig {
 }
 
 /** Target ids in declaration order. Empty when the project has no targets. */
+/** True when this project builds BASIC rather than assembly. */
+export function isBasicProject(cfg: ProjectConfig): boolean {
+    return cfg.language === 'ti-basic' || cfg.language === 'ti-extended-basic';
+}
+
+/**
+ * The source to tokenise.
+ *
+ * A BASIC-primary project drives the build from its entry source, exactly as
+ * an assembly project does. basicSource stays supported because an assembly
+ * project uses it for the loader on an Extended BASIC disk, where the BASIC
+ * program is a component rather than the program itself.
+ */
+export function basicSourceOf(cfg: ProjectConfig): string | undefined {
+    if (cfg.basicSource) { return cfg.basicSource; }
+    return isBasicProject(cfg) ? cfg.entrySource : undefined;
+}
+
 export function targetIds(cfg: ProjectConfig): string[] {
     return (cfg.targets ?? []).map(t => t.id);
 }

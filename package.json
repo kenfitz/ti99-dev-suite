@@ -683,6 +683,12 @@
         "id": "ti99.explorer",
         "label": "TI-99/4A"
       }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "ti99.json",
+        "url": "./schemas/ti99.schema.json"
+      }
     ]
   },
   "scripts": {

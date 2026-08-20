@@ -126,7 +126,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         languageIds: ["ti-basic"],
         actionKinds: ["run", "build-run"],
         outputs: ["basic-program"],
-        emulatorProfile: "classic99-xb",
+        emulatorProfile: "classic99-xb-program",
         requires: [CLASSIC99, XB_ROM],
     },
     {
@@ -136,7 +136,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "run", "build-run", "validate"],
         outputs: ["basic-program"],
-        emulatorProfile: "classic99-xb",
+        emulatorProfile: "classic99-xb-program",
         requires: [CLASSIC99, XB_ROM],
     },
     {

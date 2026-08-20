@@ -115,19 +115,44 @@ export async function createProject(extensionUri: vscode.Uri): Promise<void> {
     });
     if (!name) return;
 
-    const dialectChoice = await vscode.window.showQuickPick<DialectChoice>(DIALECT_CHOICES, {
-        title: 'Which assembly syntax?',
-        matchOnDetail: true,
-    });
-    if (!dialectChoice) return;
+    interface LanguageChoice extends vscode.QuickPickItem {
+        id: 'tms9900' | 'ti-basic' | 'ti-extended-basic';
+        template: string;
+    }
+    const language = await vscode.window.showQuickPick<LanguageChoice>([
+        {
+            label: 'TMS9900 Assembly', id: 'tms9900', template: 'multi-target',
+            detail: 'Builds a cartridge, Editor/Assembler routes and an Extended BASIC disk from one source.',
+        },
+        {
+            label: 'TI BASIC', id: 'ti-basic', template: 'ti-basic',
+            detail: 'Runs on an unexpanded console with no cartridge. The simplest thing to get running.',
+        },
+        {
+            label: 'TI Extended BASIC', id: 'ti-extended-basic', template: 'ti-extended-basic',
+            detail: 'Adds sprites, subprograms and structured statements. Needs the Extended BASIC cartridge.',
+        },
+    ], { title: 'Which language?', matchOnDetail: true });
+    if (!language) { return; }
 
-    // Every route is generated either way. This only decides which one Build
-    // and Run reaches for first.
-    const route = await vscode.window.showQuickPick<RouteChoice>(ROUTE_CHOICES, {
-        title: 'Which route should Build and Run use by default?',
-        matchOnDetail: true,
-    });
-    if (!route) return;
+    // Assembly asks about syntax and route; BASIC has neither question.
+    let dialectChoice: DialectChoice | undefined;
+    let route: RouteChoice | undefined;
+    if (language.id === 'tms9900') {
+        dialectChoice = await vscode.window.showQuickPick<DialectChoice>(DIALECT_CHOICES, {
+            title: 'Which assembly syntax?',
+            matchOnDetail: true,
+        });
+        if (!dialectChoice) { return; }
+
+        // Every route is generated either way. This only decides which one
+        // Build and Run reaches for first.
+        route = await vscode.window.showQuickPick<RouteChoice>(ROUTE_CHOICES, {
+            title: 'Which route should Build and Run use by default?',
+            matchOnDetail: true,
+        });
+        if (!route) { return; }
+    }
 
     const configPath = path.join(folder.fsPath, PROJECT_FILENAME);
     if (fs.existsSync(configPath)) {
@@ -140,7 +165,7 @@ export async function createProject(extensionUri: vscode.Uri): Promise<void> {
     const base = tiName(name, 9);
     const menu = name.toUpperCase().slice(0, 20);
 
-    const template = path.join(extensionUri.fsPath, 'templates', 'multi-target');
+    const template = path.join(extensionUri.fsPath, 'templates', language.template);
     if (!fs.existsSync(template)) {
         void vscode.window.showErrorMessage(
             `The project template is missing from the extension at ${template}.`);
@@ -148,7 +173,9 @@ export async function createProject(extensionUri: vscode.Uri): Promise<void> {
     }
 
     try {
-        fs.mkdirSync(path.join(folder.fsPath, 'lib'), { recursive: true });
+        if (language.id === 'tms9900') {
+            fs.mkdirSync(path.join(folder.fsPath, 'lib'), { recursive: true });
+        }
         copyTemplate(template, folder.fsPath, {
             NAME: name,
             STEM: stem,
@@ -158,7 +185,7 @@ export async function createProject(extensionUri: vscode.Uri): Promise<void> {
             XBNAME: `${base}X`,
             MENUNAME: menu,
             MENULEN: String(menu.length),
-            DIALECT: dialectChoice.id,
+            DIALECT: dialectChoice?.id ?? 'xdt99',
         });
     } catch (err) {
         void vscode.window.showErrorMessage(`Could not create the project: ${(err as Error).message}`);
@@ -166,7 +193,7 @@ export async function createProject(extensionUri: vscode.Uri): Promise<void> {
     }
 
     // Put the chosen route first; resolveTarget treats that as the default.
-    if (route.id !== 'cart') {
+    if (route && route.id !== 'cart') {
         try {
             const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8')) as ProjectConfig;
             const targets = cfg.targets ?? [];

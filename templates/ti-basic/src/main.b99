@@ -1,0 +1,18 @@
+100 REM {{NAME}}
+110 REM A starting point for TI BASIC.
+120 REM
+130 REM TI BASIC runs on an unexpanded console with no cartridge, so this
+140 REM program uses only what the console itself provides.
+150 REM
+160 CALL CLEAR
+170 PRINT "HELLO FROM {{MENUNAME}}"
+180 PRINT
+190 REM Colours are 1 to 16. 2 is black, 16 is white.
+200 CALL SCREEN(5)
+210 REM Wait for a key. CALL KEY returns the code in K and the status in S.
+220 PRINT "PRESS ANY KEY"
+230 CALL KEY(0,K,S)
+240 IF S=0 THEN 230
+250 CALL CLEAR
+260 PRINT "GOODBYE"
+270 END

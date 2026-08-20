@@ -1,0 +1,50 @@
+{
+    "$schema": "./.ti99/ti99.schema.json",
+    "name": "{{NAME}}",
+    "language": "ti-basic",
+    "entrySource": "src/main.b99",
+    "sources": [
+        "src/main.b99"
+    ],
+    "outputs": [
+        "basic-program"
+    ],
+    "buildDir": "build",
+    "distDir": "dist",
+    "basicName": "{{TINAME}}",
+    "tiName": "{{TINAME}}",
+    "basicFormat": "standard",
+    "defaultTarget": "program",
+    "targets": [
+        {
+            "id": "program",
+            "label": "Program",
+            "description": "Tokenised program, dropped into DSK1 to run.",
+            "outputs": [
+                "basic-program"
+            ],
+            "emulatorProfile": "classic99-basic"
+        },
+        {
+            "id": "disk",
+            "label": "Disk",
+            "description": "A disk image holding the program, for a real drive or an emulator.",
+            "outputs": [
+                "basic-program",
+                "disk-image"
+            ],
+            "emulatorProfile": "classic99-disk",
+            "disk": {
+                "geometry": "sssd",
+                "volumeName": "{{TINAME}}",
+                "files": [
+                    {
+                        "artifact": "basic-program",
+                        "tiName": "{{TINAME}}",
+                        "format": "PROGRAM"
+                    }
+                ]
+            }
+        }
+    ]
+}

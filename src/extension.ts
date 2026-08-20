@@ -23,6 +23,9 @@ import { ActionPlan, artifactCurrent, askDialect, contextFor, initRouting,
 import { LanguageId, labelOf } from './actions/languages';
 import { ActionKind, findTargetDefinition } from './actions/targets';
 import { defaultTargetFor, renameSourceReferences } from './actions/resolver';
+import { validate as validateBasic } from './lang/basic/validator';
+import { registerBasicProviders } from './lang/basic/providers';
+import type { Dialect } from './lang/basic/metadata';
 import { describeState, discover } from './toolchain/discovery';
 import type { ToolchainState } from './toolchain/discovery';
 import { Cancellation, run } from './toolchain/runner';
@@ -72,11 +75,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     registerLanguageFeatures(context);
     registerCommands(context);
+    registerBasicProviders(context);
     initRouting(context);
     void updateContextKeys(vscode.window.activeTextEditor?.document.uri, projects?.active?.config);
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(editor =>
             updateContextKeys(editor?.document.uri, projects?.active?.config)));
+
+    // Live BASIC diagnostics. Debounced, because parsing on every keystroke
+    // would run the whole pipeline several times per word for no benefit.
+    let validateTimer: NodeJS.Timeout | undefined;
+    const scheduleValidate = (document: vscode.TextDocument): void => {
+        if (document.languageId !== 'ti-basic' && document.languageId !== 'ti-extended-basic') {
+            return;
+        }
+        if (validateTimer) { clearTimeout(validateTimer); }
+        validateTimer = setTimeout(() => {
+            void validateBasicDocument(document.uri,
+                document.languageId as LanguageId).catch(() => undefined);
+        }, 400);
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(e => scheduleValidate(e.document)),
+        vscode.workspace.onDidOpenTextDocument(scheduleValidate),
+        vscode.workspace.onDidCloseTextDocument(d => diagnostics.delete(d.uri)));
+    for (const open of vscode.workspace.textDocuments) { scheduleValidate(open); }
 
     context.subscriptions.push(
         vscode.tasks.registerTaskProvider(Ti99TaskProvider.type, new Ti99TaskProvider(projects)));
@@ -772,13 +795,6 @@ async function runTargetAction(
         return;
     }
 
-    if (language === "ti-basic" || language === "ti-extended-basic") {
-        vscode.window.showInformationMessage(
-            definition.label + ": " + labelOf(language) + " builds are not wired up yet. " +
-            "Command routing and validation are in place; xbas99 tokenisation " +
-            "arrives in the next phase.");
-        return;
-    }
     if (language === "gpl") {
         vscode.window.showInformationMessage(
             "GPL is recognised but xga99 is not integrated yet.");
@@ -873,8 +889,55 @@ async function doValidate(uri?: vscode.Uri): Promise<void> {
         await doCheckHazards();
         return;
     }
-    vscode.window.showInformationMessage(
-        labelOf(language) + " validation arrives with the parser in the next phase.");
+    if (language === "gpl") {
+        void vscode.window.showInformationMessage(
+            "GPL is recognised but xga99 is not integrated yet.");
+        return;
+    }
+    await validateBasicDocument(found.uri, language);
+}
+
+/**
+ * Parse, bind and validate a BASIC document, publishing to the Problems panel.
+ *
+ * Reads the editor buffer when the file is open and the saved bytes otherwise,
+ * so the command behaves the same from the Explorer as from the editor.
+ */
+async function validateBasicDocument(uri: vscode.Uri, language: LanguageId): Promise<number> {
+    const dialect: Dialect = language === "ti-basic" ? "ti-basic" : "ti-extended-basic";
+    let text: string;
+    try {
+        const open = vscode.workspace.textDocuments.find(d => d.uri.fsPath === uri.fsPath);
+        text = open
+            ? open.getText()
+            : Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+    } catch {
+        void vscode.window.showErrorMessage("Could not read " + path.basename(uri.fsPath) + ".");
+        return 0;
+    }
+
+    const result = validateBasic(text, { dialect });
+    const problems = result.diagnostics.map(d => {
+        const range = new vscode.Range(
+            new vscode.Position(d.line, d.column),
+            new vscode.Position(d.line, d.column + Math.max(1, d.end - d.start)));
+        const diagnostic = new vscode.Diagnostic(range, d.message,
+            d.severity === "warning"
+                ? vscode.DiagnosticSeverity.Warning
+                : vscode.DiagnosticSeverity.Error);
+        diagnostic.source = DIAG_SOURCE;
+        diagnostic.code = d.code;
+        return diagnostic;
+    });
+    diagnostics.set(uri, problems);
+
+    const errors = problems.filter(p => p.severity === vscode.DiagnosticSeverity.Error).length;
+    if (errors === 0) {
+        void vscode.window.showInformationMessage(
+            path.basename(uri.fsPath) + ": no problems found (" +
+            result.program.lines.length + " lines).");
+    }
+    return errors;
 }
 
 async function doCreateProjectFromFile(context: vscode.ExtensionContext, uri?: vscode.Uri): Promise<void> {

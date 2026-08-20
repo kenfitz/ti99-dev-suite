@@ -194,7 +194,10 @@ export const XDT99_PROFILE: ToolProfile = {
         // a program called LOAD, which XB runs automatically at power-up.
         'basic-program': {
             program: '${python}',
-            args: ['${tool}/xbas99.py', '-c', '${input}', '-o', '${output}'],
+            // Long format is opt-in. Standard loads on an unexpanded console
+            // and is the format Extended BASIC auto-runs from DSK1.LOAD, so it
+            // is never abandoned merely because 32K happens to be present.
+            args: ['${tool}/xbas99.py', '-c', '${basicFormatFlag}', '${input}', '-o', '${output}'],
             cwd: '${projectRoot}',
             // xbas99 reports its own errors; the coordinator falls back to the
             // xdm99 parser, which leaves unmatched lines in the output channel.

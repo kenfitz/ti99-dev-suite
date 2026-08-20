@@ -81,7 +81,7 @@ test('toolchain commands only use variables the coordinator supplies', () => {
     'python', 'tool', 'projectRoot', 'buildDir', 'distDir', 'output', 'listing',
     'symbolFile', 'dialectFlag', 'registerFlag', 'cpuFlag', 'cartBase',
     'cartridgeName', 'diskGeometry', 'diskName', 'input', 'fileType',
-    'sources', 'includePaths',
+    'sources', 'includePaths', 'basicFormatFlag',
   ]);
   for (const p of BUILTIN_PROFILES) {
     for (const [cap, cmd] of Object.entries(p.commands)) {

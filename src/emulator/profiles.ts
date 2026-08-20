@@ -211,6 +211,67 @@ export const CLASSIC99_XB_DISK: EmulatorProfile = {
         'distribution artifact; the staged copy is for testing.',
 };
 
+/**
+ * TI BASIC on a bare console.
+ *
+ * No cartridge is involved: TI BASIC is in the console ROM, so the only
+ * requirement is Classic99 itself and somewhere to put the program. That makes
+ * this the one route that needs no ROM the user has to supply, which is worth
+ * something for a first program.
+ *
+ * TI BASIC does not auto-run anything, so the remaining step is stated rather
+ * than pretended away.
+ */
+export const CLASSIC99_BASIC: EmulatorProfile = {
+    id: 'classic99-basic',
+    displayName: 'Classic99 — TI BASIC',
+    kind: 'fiad-drop',
+    accepts: ['basic-program', 'disk-image'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: [],
+    preLaunch: [
+        { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+    ],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99Dsk1'],
+    hint: 'Choose TI BASIC from the console menu, then type  OLD DSK1.${basicName}  ' +
+        'and  RUN. TI BASIC has no auto-run, so those two steps are yours.',
+    notes: 'TI BASIC lives in the console ROM, so no cartridge file is needed. ' +
+        'The tokenised program is dropped into DSK1 under its TI name.',
+};
+
+/**
+ * Extended BASIC running a tokenised BASIC program.
+ *
+ * Distinct from the assembly Extended BASIC loader profile even though both
+ * end up with a file called LOAD on DSK1. This one carries a BASIC program the
+ * interpreter runs directly; that one carries machine code embedded in a BASIC
+ * wrapper. Confusing them produces a disk that looks right and does nothing.
+ */
+export const CLASSIC99_XB_PROGRAM: EmulatorProfile = {
+    id: 'classic99-xb-program',
+    displayName: 'Classic99 — Extended BASIC program',
+    kind: 'fiad-drop',
+    accepts: ['basic-program', 'disk-image'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
+    preLaunch: [
+        { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+    ],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
+    hint: 'Extended BASIC loaded. A standard-format program named LOAD starts by ' +
+        'itself; anything else needs  RUN "DSK1.${basicName}".',
+    notes: 'Drops the tokenised Extended BASIC program into DSK1. Naming it LOAD ' +
+        'and keeping it in standard format is what makes it auto-run.',
+};
+
 export const MAME_CART: EmulatorProfile = {
     id: 'mame-cart',
     displayName: 'MAME — cartridge (RPK)',
@@ -286,6 +347,7 @@ export const CUSTOM_EMULATOR: EmulatorProfile = {
 
 export const BUILTIN_EMULATORS: EmulatorProfile[] = [
     CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_EA_DISK, CLASSIC99_XB_DISK, CLASSIC99_XB, CLASSIC99_DISK,
+    CLASSIC99_BASIC, CLASSIC99_XB_PROGRAM,
     MAME_CART, MAME_DISK,
     JS99ER, WIN994A, CUSTOM_EMULATOR,
 ];

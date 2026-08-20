@@ -1,0 +1,21 @@
+100 REM {{NAME}}
+110 REM A starting point for TI Extended BASIC.
+120 REM
+130 REM Extended BASIC adds sprites, subprograms, :: for several statements
+140 REM on one line, and ! for an end-of-line comment.
+150 REM
+160 CALL CLEAR :: CALL SCREEN(5)
+170 DISPLAY AT(10,5):"HELLO FROM {{MENUNAME}}"
+180 REM A sprite: number, character, colour, row, column.
+190 CALL CHAR(96,"3C7EFFFFFFFF7E3C")     ! an eight by eight blob
+200 CALL SPRITE(#1,96,7,100,100,0,12)    ! moving right
+210 FOR I=1 TO 400 :: NEXT I
+220 CALL DELSPRITE(ALL)
+230 CALL GREET("GOODBYE")
+240 END
+250 REM
+260 REM A subprogram. Extended BASIC only.
+270 SUB GREET(TEXT$)
+280 DISPLAY AT(14,5):TEXT$
+290 FOR I=1 TO 200 :: NEXT I
+300 SUBEND

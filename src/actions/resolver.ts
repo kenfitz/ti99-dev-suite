@@ -11,7 +11,8 @@
  */
 
 import { ProjectConfig, TargetConfig } from "../config/project";
-import { LanguageId, LanguageResolution, resolveLanguage } from "./languages";
+import { LanguageId, LanguageResolution, findLanguage, resolveLanguage } from "./languages";
+import { scanSource } from "./evidence";
 import {
     ActionKind, Availability, TargetDefinition, availability, findTargetDefinition,
     targetsForAction, targetsForLanguage,
@@ -119,8 +120,6 @@ export function resolveFileLanguage(path: string, ctx: ResolveContext = {}): Lan
     if (needEvidence) {
         const text = ctx.readSource ? ctx.readSource(path) : undefined;
         if (text !== undefined) {
-            // Imported lazily so the resolver stays cheap for assembly.
-            const { scanSource } = require("./evidence") as typeof import("./evidence");
             const found = scanSource(text);
             extendedBasicProven = found.extendedBasicProven;
             evidenceDetail = found.detail;
@@ -185,7 +184,6 @@ export function defaultTargetFor(
         }
     }
     if (project?.defaultTarget) { return project.defaultTarget; }
-    const { findLanguage } = require("./languages") as typeof import("./languages");
     return findLanguage(language).defaultTarget;
 }
 

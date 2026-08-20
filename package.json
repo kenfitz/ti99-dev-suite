@@ -32,7 +32,11 @@
   "activationEvents": [
     "onLanguage:tms9900",
     "workspaceContains:**/ti99.json",
-    "workspaceContains:**/*.a99"
+    "workspaceContains:**/*.a99",
+    "onLanguage:ti-basic",
+    "onLanguage:ti-extended-basic",
+    "workspaceContains:**/*.b99",
+    "workspaceContains:**/*.xb99"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -45,12 +49,30 @@
         ],
         "extensions": [
           ".a99",
-          ".asm",
-          ".s",
-          ".inc",
-          ".equ"
+          ".asm"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "ti-basic",
+        "aliases": [
+          "TI BASIC"
+        ],
+        "extensions": [
+          ".b99"
+        ],
+        "configuration": "./language-configuration-basic.json"
+      },
+      {
+        "id": "ti-extended-basic",
+        "aliases": [
+          "TI Extended BASIC"
+        ],
+        "extensions": [
+          ".xb99",
+          ".xb"
+        ],
+        "configuration": "./language-configuration-basic.json"
       }
     ],
     "grammars": [
@@ -160,21 +182,145 @@
         "command": "ti99.exportToHardware",
         "title": "Export to Real Hardware",
         "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRunAs",
+        "title": "Build and Run As...",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.runAs",
+        "title": "Run As...",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.validate",
+        "title": "Validate",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.package",
+        "title": "Package...",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.selectTarget",
+        "title": "Select Target",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.selectDialect",
+        "title": "Select BASIC Dialect...",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildContainingTarget",
+        "title": "Build Containing Target",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.buildAndRunContainingTarget",
+        "title": "Build and Run Containing Target",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.selectContainingTarget",
+        "title": "Select Containing Target...",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.createProjectFromFile",
+        "title": "Create Project from Current File",
+        "category": "TI-99"
+      },
+      {
+        "command": "ti99.renameToCanonical",
+        "title": "Rename to Canonical Extension...",
+        "category": "TI-99"
       }
     ],
     "menus": {
-      "editor/title": [
+      "explorer/context": [
         {
-          "command": "ti99.buildAndRun",
-          "when": "resourceLangId == tms9900",
-          "group": "navigation"
+          "submenu": "ti99.explorer",
+          "when": "ti99.language && ti99.language != ''",
+          "group": "navigation@9"
         }
       ],
       "editor/context": [
         {
+          "submenu": "ti99.explorer",
+          "when": "ti99.language && ti99.language != ''",
+          "group": "1_modification@9"
+        },
+        {
           "command": "ti99.convertSyntax",
           "when": "resourceLangId == tms9900",
           "group": "1_modification"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ti99.buildAndRun",
+          "when": "ti99.language && ti99.language != '' && ti99.canRun",
+          "group": "navigation"
+        }
+      ],
+      "ti99.explorer": [
+        {
+          "command": "ti99.validate",
+          "when": "ti99.language && ti99.language != '' && ti99.isEntrySource",
+          "group": "1_check@1"
+        },
+        {
+          "command": "ti99.build",
+          "when": "ti99.canBuild && ti99.isEntrySource",
+          "group": "2_build@1"
+        },
+        {
+          "command": "ti99.buildAndRun",
+          "when": "ti99.canRun && ti99.isEntrySource",
+          "group": "2_build@2"
+        },
+        {
+          "command": "ti99.buildAndRunAs",
+          "when": "ti99.canRun && ti99.isEntrySource",
+          "group": "2_build@3"
+        },
+        {
+          "command": "ti99.run",
+          "when": "ti99.canRun && ti99.isEntrySource",
+          "group": "3_run@1"
+        },
+        {
+          "command": "ti99.package",
+          "when": "ti99.canPackage && ti99.isEntrySource",
+          "group": "3_run@2"
+        },
+        {
+          "command": "ti99.selectDialect",
+          "when": "ti99.language == 'basic-ambiguous'",
+          "group": "1_check@1"
+        },
+        {
+          "command": "ti99.buildContainingTarget",
+          "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
+          "group": "2_build@1"
+        },
+        {
+          "command": "ti99.buildAndRunContainingTarget",
+          "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
+          "group": "2_build@2"
+        },
+        {
+          "command": "ti99.selectContainingTarget",
+          "when": "ti99.hasContainingTarget && !ti99.isEntrySource",
+          "group": "2_build@3"
+        },
+        {
+          "command": "ti99.showDiskCatalog",
+          "when": "resourceExtname == .dsk",
+          "group": "4_disk@1"
         }
       ]
     },
@@ -510,7 +656,13 @@
         "editor.formatOnSave": false,
         "editor.wordBasedSuggestions": "off"
       }
-    }
+    },
+    "submenus": [
+      {
+        "id": "ti99.explorer",
+        "label": "TI-99/4A"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

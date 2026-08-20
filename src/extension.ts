@@ -17,6 +17,11 @@ import { ProjectManager } from './config/loader';
 import type { Project } from './config/loader';
 import type { Capability, Processor } from './config/project';
 import { resolveTarget, targetIds } from './config/project';
+import { ActionPlan, askDialect, contextFor, initRouting, offerCanonicalRename,
+    pickTargetFor, planFor, updateContextKeys } from './actions/routing';
+import { LanguageId, labelOf } from './actions/languages';
+import { ActionKind, findTargetDefinition } from './actions/targets';
+import { defaultTargetFor } from './actions/resolver';
 import { describeState, discover } from './toolchain/discovery';
 import type { ToolchainState } from './toolchain/discovery';
 import { Cancellation, run } from './toolchain/runner';
@@ -66,6 +71,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     registerLanguageFeatures(context);
     registerCommands(context);
+    initRouting(context);
+    void updateContextKeys(vscode.window.activeTextEditor?.document.uri, projects?.active?.config);
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(editor =>
+            updateContextKeys(editor?.document.uri, projects?.active?.config)));
 
     context.subscriptions.push(
         vscode.tasks.registerTaskProvider(Ti99TaskProvider.type, new Ti99TaskProvider(projects)));
@@ -631,6 +641,233 @@ function splitOperands(operand: string): string[] {
 // Commands
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Context-aware routing.
+//
+// These handlers accept the URI the Explorer passes and fall back to the
+// active editor, so the same command works from a right-click, from the
+// Command Palette, and from a tree view. All of them ask the resolver rather
+// than deciding anything themselves.
+// ---------------------------------------------------------------------------
+
+/** The file a command applies to: what was clicked, else what is open. */
+function targetUri(uri?: vscode.Uri): vscode.Uri | undefined {
+    if (uri instanceof vscode.Uri) { return uri; }
+    return vscode.window.activeTextEditor?.document.uri;
+}
+
+async function planForUri(uri?: vscode.Uri): Promise<{ uri: vscode.Uri; plan: ActionPlan } | undefined> {
+    let resolved = targetUri(uri);
+    if (!resolved) {
+        const project = projects?.active;
+        const entry = project?.config.entrySource;
+        if (project && entry) {
+            resolved = vscode.Uri.file(path.join(project.root.fsPath, entry));
+        }
+    }
+    if (!resolved) {
+        vscode.window.showInformationMessage("Open a TI-99 source file first.");
+        return undefined;
+    }
+    const project = projects?.active;
+    return { uri: resolved, plan: planFor(resolved, project?.config) };
+}
+
+/** Ask for a dialect when the file does not say, then act with the answer. */
+async function withLanguage(
+    uri: vscode.Uri, plan: ActionPlan,
+): Promise<LanguageId | undefined> {
+    if (plan.language.language) { return plan.language.language; }
+    if (!plan.needsDialectChoice) {
+        vscode.window.showInformationMessage(
+            path.basename(uri.fsPath) + " is not a TI-99 source file.");
+        return undefined;
+    }
+    return askDialect(uri);
+}
+
+async function doSelectDialect(uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    const language = await askDialect(found.uri);
+    if (!language) { return; }
+    vscode.window.showInformationMessage(
+        path.basename(found.uri.fsPath) + " is now treated as " + labelOf(language) + ".");
+    const project = projects?.active;
+    await updateContextKeys(found.uri, project?.config);
+}
+
+/**
+ * Build and Run, with or without the target question.
+ *
+ * chooseTarget is what separates the two commands: the plain one uses the
+ * resolved default so frequent work is one click, and the ... variant always
+ * asks so the other routes stay reachable.
+ */
+async function doRouted(
+    action: ActionKind, chooseTarget: boolean, uri?: vscode.Uri,
+): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    const { plan } = found;
+
+    if (plan.source.role === "module") {
+        await doContainingTarget(action === "build" ? false : true, found.uri, plan);
+        return;
+    }
+
+    const language = await withLanguage(found.uri, plan);
+    if (!language) { return; }
+
+    const project = projects?.active;
+    const ctx = contextFor(found.uri, project?.config);
+
+    let targetId = chooseTarget ? undefined : defaultTargetFor(language, ctx, found.uri.fsPath);
+    if (!targetId) {
+        const picked = await pickTargetFor(language, action, ctx, found.uri.fsPath);
+        if (!picked) { return; }
+        targetId = picked.id;
+    }
+
+    await runTargetAction(action, targetId, language);
+}
+
+/**
+ * Carry out an action against a resolved target.
+ *
+ * Assembly targets map onto the existing build coordinator, which already
+ * knows these routes. BASIC targets are routed and named here but their
+ * pipelines land in the next phase, so they say so plainly rather than
+ * failing somewhere inside the toolchain.
+ */
+async function runTargetAction(
+    action: ActionKind, targetId: string, language: LanguageId,
+): Promise<void> {
+    const definition = findTargetDefinition(targetId);
+    if (!definition) {
+        vscode.window.showErrorMessage("Unknown target '" + targetId + "'.");
+        return;
+    }
+
+    if (language === "ti-basic" || language === "ti-extended-basic") {
+        vscode.window.showInformationMessage(
+            definition.label + ": " + labelOf(language) + " builds are not wired up yet. " +
+            "Command routing and validation are in place; xbas99 tokenisation " +
+            "arrives in the next phase.");
+        return;
+    }
+    if (language === "gpl") {
+        vscode.window.showInformationMessage(
+            "GPL is recognised but xga99 is not integrated yet.");
+        return;
+    }
+
+    switch (action) {
+        case "build":
+            await doBuildTarget(false, targetId);
+            return;
+        case "run":
+            // Run means run what was built. Rebuilding first is the caller
+            // choice, so a bare Run reuses the artifacts of the last build.
+            if (!lastBuild?.artifacts?.length) {
+                void vscode.window.showInformationMessage(
+                    "Nothing has been built for " + definition.label + " yet. Use Build and Run.");
+                return;
+            }
+            await doRun(lastBuild.artifacts);
+            return;
+        case "build-run":
+            if (await doBuild({ rebuild: false, target: targetId })) {
+                await doRun(lastBuild?.artifacts);
+            }
+            return;
+        case "package":
+            await doBuildTarget(false, targetId);
+            return;
+        case "validate":
+            await doCheckHazards();
+            return;
+    }
+}
+
+/** A module is not a program; act on the target that contains it. */
+async function doContainingTarget(
+    run: boolean, uri?: vscode.Uri, known?: ActionPlan,
+): Promise<void> {
+    const found = known && uri ? { uri, plan: known } : await planForUri(uri);
+    if (!found) { return; }
+    const ids = found.plan.containingTargetIds ?? [];
+
+    if (ids.length === 0) {
+        vscode.window.showInformationMessage(
+            path.basename(found.uri.fsPath) + " does not belong to any build target. " +
+            "Add it to a target in ti99.json.");
+        return;
+    }
+
+    let chosen = ids[0];
+    if (ids.length > 1) {
+        const picked = await vscode.window.showQuickPick(ids, {
+            title: path.basename(found.uri.fsPath) + " belongs to several targets. Which one?",
+        });
+        if (!picked) { return; }
+        chosen = picked;
+    }
+    if (run) {
+        if (await doBuild({ rebuild: false, target: chosen })) { await doRun(lastBuild?.artifacts); }
+    } else {
+        await doBuildTarget(false, chosen);
+    }
+}
+
+async function doSelectContainingTarget(uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    const ids = found.plan.containingTargetIds ?? [];
+    if (ids.length === 0) {
+        vscode.window.showInformationMessage(
+            path.basename(found.uri.fsPath) + " does not belong to any build target.");
+        return;
+    }
+    const picked = await vscode.window.showQuickPick(ids, { title: "Containing targets" });
+    if (picked) { await doBuildTarget(false, picked); }
+}
+
+/** Validate without building: what the language service can say up front. */
+async function doValidate(uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    const language = await withLanguage(found.uri, found.plan);
+    if (!language) { return; }
+
+    if (language === "tms9900") {
+        await doCheckHazards();
+        return;
+    }
+    vscode.window.showInformationMessage(
+        labelOf(language) + " validation arrives with the parser in the next phase.");
+}
+
+async function doCreateProjectFromFile(context: vscode.ExtensionContext, uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    void vscode.window.showInformationMessage(
+        "Creating a project around " + path.basename(found.uri.fsPath) + ".");
+    await createProject(context.extensionUri);
+}
+
+async function doRenameToCanonical(uri?: vscode.Uri): Promise<void> {
+    const found = await planForUri(uri);
+    if (!found) { return; }
+    const language = found.plan.language.language;
+    if (!language) {
+        vscode.window.showInformationMessage("Resolve the dialect first.");
+        return;
+    }
+    await offerCanonicalRename(found.uri, language);
+}
+
 function registerCommands(context: vscode.ExtensionContext): void {
     const register = (id: string, handler: (...args: never[]) => unknown) =>
         context.subscriptions.push(vscode.commands.registerCommand(id, handler));
@@ -653,6 +890,20 @@ function registerCommands(context: vscode.ExtensionContext): void {
     register('ti99.showMemoryMap', doShowMemoryMap);
     register('ti99.showDiskCatalog', doShowDiskCatalog);
     register('ti99.exportToHardware', doExportToHardware);
+
+    // Context-aware routing. Every one of these asks the resolver, so the
+    // Explorer menu and the Command Palette cannot answer differently.
+    register('ti99.buildAndRunAs', (uri?: vscode.Uri) => doRouted('build-run', true, uri));
+    register('ti99.runAs', (uri?: vscode.Uri) => doRouted('run', true, uri));
+    register('ti99.validate', (uri?: vscode.Uri) => doValidate(uri));
+    register('ti99.package', (uri?: vscode.Uri) => doRouted('package', true, uri));
+    register('ti99.selectTarget', (uri?: vscode.Uri) => doRouted('build', true, uri));
+    register('ti99.selectDialect', (uri?: vscode.Uri) => doSelectDialect(uri));
+    register('ti99.buildContainingTarget', (uri?: vscode.Uri) => doContainingTarget(false, uri));
+    register('ti99.buildAndRunContainingTarget', (uri?: vscode.Uri) => doContainingTarget(true, uri));
+    register('ti99.selectContainingTarget', (uri?: vscode.Uri) => doSelectContainingTarget(uri));
+    register('ti99.createProjectFromFile', (uri?: vscode.Uri) => doCreateProjectFromFile(context, uri));
+    register('ti99.renameToCanonical', (uri?: vscode.Uri) => doRenameToCanonical(uri));
 }
 
 function stem(project: Project): string {

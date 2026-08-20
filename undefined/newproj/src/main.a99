@@ -1,5 +1,5 @@
 *----------------------------------------------------------------------
-* {{NAME}} - shared program body
+* hello - shared program body
 *
 * This is the file to edit. It contains the whole program and nothing
 * loader-specific: no AORG, no cartridge header, no DEF. Each file in

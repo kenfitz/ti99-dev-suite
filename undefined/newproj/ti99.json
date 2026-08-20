@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "name": "hello",
+  "type": "cartridge-rpk",
+
+  "syntaxDialect": "xdt99",
+  "toolchainProfile": "xdt99",
+  "processor": "9900",
+  "registerSymbols": true,
+
+  "entrySource": "src/targets/cart.a99",
+  "sources": ["src/targets/cart.a99"],
+  "includePaths": [".", "src", "src/targets", "lib"],
+  "defines": {},
+
+  "outputs": ["cart-rpk", "cart-bin"],
+  "buildDir": "build",
+  "distDir": "dist",
+  "tiName": "HELLO",
+
+  "cartridge": {
+    "name": "HELLO WORLD",
+    "baseAddress": ">6000",
+    "banking": "none",
+    "binFilename": "HELLOC.BIN"
+  },
+
+  "assembler": {
+    "unresolvedReferencePolicy": "warning",
+    "extraArgs": []
+  },
+
+  "targets": [
+    {
+      "id": "cart",
+      "label": "Cartridge",
+      "description": "ROM at >6000. Runs on a bare console - nothing else needed.",
+      "buildDir": "build/cart",
+      "distDir": "dist/cart",
+      "emulatorProfile": "classic99-cart"
+    },
+    {
+      "id": "ea",
+      "label": "Editor/Assembler",
+      "description": "Tagged object for option 3 and a memory image for option 5.",
+      "type": "ea3-object",
+      "entrySource": "src/targets/ea.a99",
+      "outputs": ["ea3-object", "ea5-image", "tifiles", "ea3-tifiles"],
+      "buildDir": "build/ea",
+      "distDir": "dist/ea",
+      "emulatorProfile": "classic99-ea",
+      "assembler": { "unresolvedReferencePolicy": "information" }
+    },
+    {
+      "id": "disk-xb",
+      "label": "Extended BASIC disk",
+      "description": "Disk with a loader that shows progress. RUN \"DSK1.LOAD\" - no Editor/Assembler needed.",
+      "type": "disk",
+      "entrySource": "src/targets/disk-xb.a99",
+      "outputs": ["ea3-object", "ea3-tifiles", "basic-program", "basic-tifiles", "disk-image"],
+      "buildDir": "build/disk-xb",
+      "distDir": "dist/disk-xb",
+      "basicSource": "boot/LOAD.b99",
+      "basicName": "LOAD",
+      "tiName": "HELLOX",
+      "emulatorProfile": "classic99-xbdisk",
+      "disk": {
+        "geometry": "sssd",
+        "volumeName": "HELLO",
+        "files": [
+          { "artifact": "basic-program", "tiName": "LOAD", "format": "PROGRAM" },
+          { "artifact": "ea3-object", "tiName": "HELLOX", "format": "DIS/FIX 80" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+*----------------------------------------------------------------------
+* Target: Editor/Assembler
+*
+* Builds     dist/ea/HELLOO   tagged object, for option 3
+*            dist/ea/HELLO    memory image, for option 5
+* Requires   Editor/Assembler cartridge + 32K expansion + disk
+*
+* Relocatable, so the loader places it wherever there is room.
+*
+* Option 3 asks for a program name and finds it through DEF, so it needs
+* no help. Option 5 has no entry field in its header at all - it simply
+* begins executing at the address it loaded to. MAIN is not the first
+* thing emitted, because the body starts with equates and the utility
+* routines, so BOOT sits at offset 0 and jumps to it.
+*----------------------------------------------------------------------
+       DEF  MAIN
+
+BOOT   B    @MAIN            * Entry for loaders that jump to offset 0
+
+       COPY "../main.a99"

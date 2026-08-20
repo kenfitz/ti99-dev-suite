@@ -1,0 +1,35 @@
+*----------------------------------------------------------------------
+* Target: cartridge
+*
+* Builds     dist/cart/HELLOC.BIN  and  hello.rpk
+* Requires   nothing but a console
+*
+* ROM at >6000 with the standard >AA header. The console reads the
+* program list, shows the menu text on the title screen, and branches to
+* the address given here - so the entry point is declared rather than
+* guessed at.
+*
+* The code is in ROM and cannot write to itself. Variables belong in
+* scratchpad; see the notes in ../main.a99.
+*----------------------------------------------------------------------
+       DEF  STDHDR
+
+       AORG >6000
+
+STDHDR BYTE >AA               * Standard header marker
+       BYTE >01               * Version
+       BYTE >01               * One program in the list
+       BYTE >00               * Reserved
+       DATA >0000             * Power-up list - none
+       DATA PROG              * Program list
+       DATA >0000             * DSR list - none
+       DATA >0000             * Subprogram list - none
+       DATA >0000             * Interrupt list - none
+
+PROG   DATA >0000             * No next item
+       DATA MAIN              * Entry point
+       BYTE 11                 * Length of the menu text
+       TEXT 'HELLO WORLD'
+       EVEN
+
+       COPY "../main.a99"

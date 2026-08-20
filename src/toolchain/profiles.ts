@@ -63,7 +63,7 @@ export const XDT99_PROFILE: ToolProfile = {
         'assemble', 'link', 'listing', 'symbols',
         'cart-rpk', 'cart-bin', 'ea3-object', 'ea5-image',
         'disk-image', 'tifiles', 'basic-program', 'basic-tifiles', 'xb-program',
-        'ea3-tifiles',
+        'ea3-tifiles', 'xb-tifiles',
     ],
     detect: {
         files: ['xas99.py'],
@@ -143,6 +143,15 @@ export const XDT99_PROFILE: ToolProfile = {
             ],
             cwd: '${projectRoot}',
             problemMatcher: 'xas99',
+            successRequiresArtifact: '${output}',
+        },
+        // Wrap the embedded Extended BASIC program for a FIAD directory, so
+        // RUN "DSK1.LOAD" works without mounting a disk image.
+        'xb-tifiles': {
+            program: '${python}',
+            args: ['${tool}/xdm99.py', '-T', '${input}', '-f', 'INT/VAR 254', '-o', '${output}'],
+            cwd: '${projectRoot}',
+            problemMatcher: 'xdm99',
             successRequiresArtifact: '${output}',
         },
         // Wrap the tagged object for a FIAD directory, so Editor/Assembler

@@ -182,22 +182,28 @@ export const CLASSIC99_EA_DISK: EmulatorProfile = {
  */
 export const CLASSIC99_XB_DISK: EmulatorProfile = {
     id: 'classic99-xbdisk',
-    displayName: 'Classic99 — Extended BASIC cartridge + disk image',
-    kind: 'process',
+    displayName: 'Classic99 — Extended BASIC cartridge + DSK1',
+    kind: 'fiad-drop',
     accepts: ['xb-program', 'disk-image'],
     executable: '${config:ti99.emulator.classic99Path}',
     args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
+    preLaunch: [
+        { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        // Staged rather than mounted. Mounting a disk is a manual step in
+        // Classic99, and a stale file left in the FIAD folder will shadow the
+        // image the user thinks they are running.
+        { action: 'copy', from: '${artifact:xb-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+    ],
     singleInstance: true,
     detached: true,
     platforms: ['win32'],
-    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom'],
-    hint: 'Extended BASIC loaded. Insert the disk: Disk > DSK1 > open ' +
-        '${artifact:disk-image} — then type  RUN "DSK1.LOAD"  and wait. The ' +
-        'whole game travels inside the BASIC program, so loading takes about ' +
-        'a minute before the title screen appears.',
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
+    hint: 'Extended BASIC loaded. Type  RUN "DSK1.${basicName}"  and wait — the ' +
+        'whole game travels inside the BASIC program, so it takes about a ' +
+        'minute before the title screen appears.',
     notes: 'The game is embedded in the Extended BASIC program, so the Editor/' +
-        'Assembler cartridge is not required. Cartridge ROMs are not distributed ' +
-        'with the extension.',
+        'Assembler cartridge is not required. The .dsk in distDir is the ' +
+        'distribution artifact; the staged copy is for testing.',
 };
 
 export const MAME_CART: EmulatorProfile = {

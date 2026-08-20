@@ -269,6 +269,7 @@ export class BuildCoordinator {
             case 'basic-tifiles': return path.join(dist, config.basicName ?? 'LOAD');
             // Extended BASIC runs a program called LOAD from DSK1 at power-up.
             case 'xb-program': return path.join(dist, config.basicName ?? 'LOAD');
+            case 'xb-tifiles': return path.join(dist, `${config.basicName ?? 'LOAD'}.tfi`);
             case 'tifiles': return path.join(dist, `${tiStem}.tfi`);
             default: return path.join(build, `${stem}.${capability}`);
         }
@@ -309,6 +310,8 @@ export class BuildCoordinator {
                     ? this.outputPathFor(project, 'basic-program')
                 : capability === 'ea3-tifiles'
                     ? this.outputPathFor(project, 'ea3-object')
+                : capability === 'xb-tifiles'
+                    ? this.outputPathFor(project, 'xb-program')
                     : wrapped ? this.outputPathFor(project, wrapped) : '';
 
         const variables = toolchain.tool!.profile.variables ?? {};

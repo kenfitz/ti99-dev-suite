@@ -11,7 +11,7 @@ export type Capability =
     | 'assemble' | 'link' | 'listing' | 'symbols'
     | 'cart-rpk' | 'cart-bin' | 'ea3-object' | 'ea5-image'
     | 'disk-image' | 'tifiles' | 'basic-program' | 'basic-tifiles'
-    | 'xb-program' | 'ea3-tifiles';
+    | 'xb-program' | 'ea3-tifiles' | 'xb-tifiles';
 
 export type Processor = '9900' | '9995' | '99000' | 'f18a';
 

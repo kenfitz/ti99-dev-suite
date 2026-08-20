@@ -234,6 +234,9 @@ export class EmulatorLauncher implements vscode.Disposable {
                 case 'buildDir': return path.resolve(root, project.config.buildDir);
                 case 'distDir': return path.resolve(root, project.config.distDir);
                 case 'tiFilename': return tiFilename;
+                // On-disk name of the tokenised BASIC program. Extended
+                // BASIC runs one called LOAD from DSK1 at power-up.
+                case 'basicName': return project.config.basicName ?? 'LOAD';
                 case 'extraArgs': return '';
                 default: return '';
             }

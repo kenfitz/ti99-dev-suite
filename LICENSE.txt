@@ -19,31 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-THIRD PARTY NOTICES
-
-This extension invokes, but does not bundle or modify, the following software:
-
-  xdt99 (xas99, xdm99, xga99, xhm99, xvm99)
-  Copyright (c) Ralph Benzinger
-  Licensed under the GNU General Public License version 3.
-  https://github.com/endlos99/xdt99
-
-  Because xdt99 is executed as a separate program rather than linked or
-  redistributed, this extension is an aggregate work and is not itself
-  subject to the GPL. Bundling xdt99 into the extension package would change
-  that analysis and requires a licence review first.
-
-Classic99 is Copyright (c) Mike Brent (Tursi). MAME is Copyright (c) the MAME
-team. Win994a is Copyright (c) Cory Burr. None of these are distributed with
-this extension.
-
-TI-99/4A, TI-99/4 and Texas Instruments are trademarks of Texas Instruments
-Incorporated. This project is not affiliated with, endorsed by, or sponsored
-by Texas Instruments, the xdt99 project, the MAME project, or the authors of
-any emulator referenced here.
-
-No Texas Instruments ROMs, GROMs, cartridge images or system firmware are
-distributed with this extension, and it will not download them for you.

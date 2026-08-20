@@ -261,6 +261,10 @@ Released under the [MIT licence](LICENSE.txt) — you may use, modify and
 redistribute it, including commercially, provided the copyright notice and
 licence text are kept.
 
+Third party software this extension works with, and the trademarks it
+references, are recorded in [NOTICE.md](NOTICE.md). Notably xdt99 is GPL v3 and
+is invoked as a separate program, never bundled or modified.
+
 ---
 
 ## Credits

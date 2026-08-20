@@ -319,6 +319,16 @@
             "default": "",
             "description": "Classic99 DSK1 folder. Disk builds drop TIFILES output here, since Classic99 cannot write to .dsk images."
           },
+          "ti99.emulator.classic99EaRom": {
+            "type": "string",
+            "default": "",
+            "description": "Editor/Assembler cartridge for Classic99, passed as -rom. Classic99 reads the ROM type from the last letter of the filename (C = CPU ROM, D = second bank, G = GROM). Not distributed with the extension."
+          },
+          "ti99.emulator.classic99XbRom": {
+            "type": "string",
+            "default": "",
+            "description": "Extended BASIC cartridge for Classic99, passed as -rom. Needed for a boot disk, since Extended BASIC is what runs the LOAD program. Not distributed with the extension."
+          },
           "ti99.emulator.mamePath": {
             "type": "string",
             "default": "",

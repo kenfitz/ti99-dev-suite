@@ -10,7 +10,7 @@ export type ProjectType = 'cartridge-rpk' | 'cartridge-bin' | 'ea5-image' | 'ea3
 export type Capability =
     | 'assemble' | 'link' | 'listing' | 'symbols'
     | 'cart-rpk' | 'cart-bin' | 'ea3-object' | 'ea5-image'
-    | 'disk-image' | 'tifiles' | 'basic-program';
+    | 'disk-image' | 'tifiles' | 'basic-program' | 'basic-tifiles';
 
 export type Processor = '9900' | '9995' | '99000' | 'f18a';
 
@@ -71,6 +71,13 @@ export interface ProjectConfig {
     basicSource?: string;
     /** On-disk name for the tokenised program. Defaults to LOAD. */
     basicName?: string;
+    /**
+     * TI filename used when staging into a FIAD directory such as Classic99's
+     * DSK1. Without it the name comes from whichever artifact happens to be
+     * first, which can disagree with what the program asks for - a boot disk
+     * whose LOAD does CALL LOAD("DSK1.SNAKE") needs the file to be SNAKE.
+     */
+    tiName?: string;
     assembler: AssemblerOptions;
     /** Distribution routes. Omit for a single-output project. */
     targets?: TargetConfig[];
@@ -103,6 +110,7 @@ export interface TargetConfig {
     disk?: DiskOptions;
     basicSource?: string;
     basicName?: string;
+    tiName?: string;
     assembler?: Partial<AssemblerOptions>;
 }
 
@@ -152,6 +160,7 @@ export function resolveTarget(cfg: ProjectConfig, id?: string): ProjectConfig {
         disk: target.disk ?? cfg.disk,
         basicSource: target.basicSource ?? cfg.basicSource,
         basicName: target.basicName ?? cfg.basicName,
+        tiName: target.tiName ?? cfg.tiName,
         assembler: { ...cfg.assembler, ...target.assembler },
         // A resolved target is a plain config. Dropping the list prevents a
         // second resolve from being applied on top of the first.

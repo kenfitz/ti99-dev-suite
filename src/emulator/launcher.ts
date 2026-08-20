@@ -84,6 +84,28 @@ export class EmulatorLauncher implements vscode.Disposable {
             return true;
         }
 
+        // Check required settings before staging anything. An unresolved argument
+        // is dropped later, which would turn '-rom <path>' into a bare '-rom'
+        // and start the emulator with no cartridge - exactly the failure this
+        // is meant to prevent.
+        const missing = (profile.requires ?? []).filter(key => {
+            const dot = key.lastIndexOf('.');
+            const section = key.slice(0, dot);
+            const name = key.slice(dot + 1);
+            const value = vscode.workspace.getConfiguration(section).get<string>(name);
+            return !value || !value.trim();
+        });
+        if (missing.length) {
+            this.output.appendLine(
+                `${profile.displayName}: not configured - ${missing.join(', ')}`);
+            const choice = await vscode.window.showErrorMessage(
+                `${profile.displayName} needs ${missing.join(' and ')}.`, 'Open Settings');
+            if (choice === 'Open Settings') {
+                await vscode.commands.executeCommand('workbench.action.openSettings', missing[0]);
+            }
+            return false;
+        }
+
         // Pre-launch file staging, e.g. dropping TIFILES into Classic99's DSK1.
         if (profile.preLaunch) {
             for (const step of profile.preLaunch) {
@@ -174,7 +196,10 @@ export class EmulatorLauncher implements vscode.Disposable {
         for (const a of artifacts) if (!byKind.has(a.kind)) byKind.set(a.kind, a);
 
         const primary = artifacts.find(a => a.runnable);
-        const tiFilename = primary
+        // An explicit tiName wins: the program may name the file it loads.
+        const tiFilename = project.config.tiName
+            ? project.config.tiName.toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 10)
+            : primary
             ? path.basename(primary.path).toUpperCase().replace(/\.[^.]*$/, '')
             : project.config.name.toUpperCase().slice(0, 10);
 

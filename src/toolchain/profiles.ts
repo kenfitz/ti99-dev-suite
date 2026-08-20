@@ -62,7 +62,7 @@ export const XDT99_PROFILE: ToolProfile = {
     capabilities: [
         'assemble', 'link', 'listing', 'symbols',
         'cart-rpk', 'cart-bin', 'ea3-object', 'ea5-image',
-        'disk-image', 'tifiles', 'basic-program',
+        'disk-image', 'tifiles', 'basic-program', 'basic-tifiles',
     ],
     detect: {
         files: ['xas99.py'],
@@ -142,6 +142,16 @@ export const XDT99_PROFILE: ToolProfile = {
             ],
             cwd: '${projectRoot}',
             problemMatcher: 'xas99',
+            successRequiresArtifact: '${output}',
+        },
+        // Wrap the tokenised BASIC program for a FIAD directory. Classic99 will
+        // not read a headerless file unless FIAD_AllowNoHeaderAsDF128 is on, and
+        // even then it would guess DIS/FIX 128 rather than PROGRAM.
+        'basic-tifiles': {
+            program: '${python}',
+            args: ['${tool}/xdm99.py', '-T', '${input}', '-f', 'PROGRAM', '-o', '${output}'],
+            cwd: '${projectRoot}',
+            problemMatcher: 'xdm99',
             successRequiresArtifact: '${output}',
         },
         // Tokenise a TI BASIC / Extended BASIC program. An XB boot disk needs

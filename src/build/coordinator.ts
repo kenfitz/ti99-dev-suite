@@ -264,7 +264,8 @@ export class BuildCoordinator {
             case 'disk-image': return path.join(dist, `${stem}.dsk`);
             // Extended BASIC runs a program called LOAD from DSK1 at power-up,
             // so that is the default name a boot disk wants.
-            case 'basic-program': return path.join(dist, config.basicName ?? 'LOAD');
+            case 'basic-program': return path.join(build, config.basicName ?? 'LOAD');
+            case 'basic-tifiles': return path.join(dist, config.basicName ?? 'LOAD');
             case 'tifiles': return path.join(dist, `${tiStem}.tfi`);
             default: return path.join(build, `${stem}.${capability}`);
         }
@@ -298,9 +299,12 @@ export class BuildCoordinator {
             : config.outputs.includes('cart-bin') ? 'cart-bin'
             : undefined;
 
-        const inputPath = capability === 'basic-program'
-            ? (config.basicSource ? path.resolve(root, config.basicSource) : '')
-            : wrapped ? this.outputPathFor(project, wrapped) : '';
+        const inputPath =
+            capability === 'basic-program'
+                ? (config.basicSource ? path.resolve(root, config.basicSource) : '')
+                : capability === 'basic-tifiles'
+                    ? this.outputPathFor(project, 'basic-program')
+                    : wrapped ? this.outputPathFor(project, wrapped) : '';
 
         const variables = toolchain.tool!.profile.variables ?? {};
         const pick = (key: string, value: string): string => {

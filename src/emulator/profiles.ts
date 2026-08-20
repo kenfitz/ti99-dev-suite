@@ -39,6 +39,15 @@ export interface EmulatorProfile {
     detached?: boolean;
     /** Restrict to these values of process.platform. */
     platforms?: NodeJS.Platform[];
+    /**
+     * Settings that must hold a value before this profile can launch.
+     *
+     * Unresolved arguments are dropped, which is right for an optional list
+     * like extraArgs but wrong for a flag with a value: dropping the value of
+     * '-rom' leaves a bare '-rom'. Naming the settings here turns that into a
+     * clear message about what to configure.
+     */
+    requires?: string[];
     notes?: string;
 }
 
@@ -77,6 +86,53 @@ export const CLASSIC99_DISK: EmulatorProfile = {
         'option 5 for an image or option 3 for an object file.',
 };
 
+/**
+ * Running anything that is not a cartridge needs a cartridge anyway: the bare
+ * console has no way to load code from disk. These two profiles load the
+ * loader, so Run reaches the program instead of the TI BASIC prompt.
+ */
+export const CLASSIC99_EA: EmulatorProfile = {
+    id: 'classic99-ea',
+    displayName: 'Classic99 — Editor/Assembler cartridge + DSK1',
+    kind: 'fiad-drop',
+    accepts: ['ea5-image', 'ea3-object'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: ['-rom', '${config:ti99.emulator.classic99EaRom}'],
+    preLaunch: [
+        { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        { action: 'copy', from: '${artifact:tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${tiFilename}' },
+    ],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99EaRom', 'ti99.emulator.classic99Dsk1'],
+    notes: 'Loads the Editor/Assembler cartridge and drops the build into DSK1. ' +
+        'Choose option 5 for a memory image or option 3 for a tagged object, then ' +
+        'the program name from DEF. Cartridge ROMs are not distributed with the ' +
+        'extension; point the setting at your own copy.',
+};
+
+export const CLASSIC99_XB: EmulatorProfile = {
+    id: 'classic99-xb',
+    displayName: 'Classic99 — Extended BASIC cartridge + DSK1',
+    kind: 'fiad-drop',
+    accepts: ['ea3-object', 'disk-image'],
+    executable: '${config:ti99.emulator.classic99Path}',
+    args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
+    preLaunch: [
+        { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
+        { action: 'copy', from: '${artifact:tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${tiFilename}' },
+        { action: 'copy', from: '${artifact:basic-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/LOAD' },
+    ],
+    singleInstance: true,
+    detached: true,
+    platforms: ['win32'],
+    requires: ['ti99.emulator.classic99Path', 'ti99.emulator.classic99XbRom', 'ti99.emulator.classic99Dsk1'],
+    notes: 'Loads Extended BASIC and drops the build plus its LOAD program into ' +
+        'DSK1. XB runs a program called LOAD at power-up, so the game starts by ' +
+        'itself. Cartridge ROMs are not distributed with the extension.',
+};
+
 export const MAME_CART: EmulatorProfile = {
     id: 'mame-cart',
     displayName: 'MAME — cartridge (RPK)',
@@ -109,6 +165,7 @@ export const MAME_DISK: EmulatorProfile = {
         '${extraArgs}',
     ],
     detached: true,
+    requires: ['ti99.emulator.mamePath', 'ti99.emulator.eaCartridgePath'],
     notes: 'Requires an Editor/Assembler cartridge image, which the extension will ' +
         'never download for you. Point ti99.emulator.eaCartridgePath at your own copy.',
 };
@@ -150,7 +207,7 @@ export const CUSTOM_EMULATOR: EmulatorProfile = {
 };
 
 export const BUILTIN_EMULATORS: EmulatorProfile[] = [
-    CLASSIC99_CART, CLASSIC99_DISK,
+    CLASSIC99_CART, CLASSIC99_EA, CLASSIC99_XB, CLASSIC99_DISK,
     MAME_CART, MAME_DISK,
     JS99ER, WIN994A, CUSTOM_EMULATOR,
 ];

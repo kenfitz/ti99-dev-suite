@@ -291,6 +291,35 @@
               "ea3-object",
               "disk"
             ]
+          },
+          "basicPrograms": {
+            "type": "array",
+            "description": "Several BASIC programs to build and place on one disk. Used for a distribution disk that carries a menu and the programs it launches. A program named LOAD is what Extended BASIC runs at power-up.",
+            "items": {
+              "type": "object",
+              "required": [
+                "source",
+                "tiName"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "Project-relative path to the BASIC source."
+                },
+                "tiName": {
+                  "type": "string",
+                  "maxLength": 10,
+                  "description": "TI filename on the disk. Ten characters, no spaces."
+                },
+                "format": {
+                  "enum": [
+                    "standard",
+                    "long"
+                  ],
+                  "description": "Per-program format. Long does not auto-run."
+                }
+              }
+            }
           }
         }
       }
@@ -308,6 +337,35 @@
     "toolchainProfile": {
       "type": "string",
       "description": "Toolchain profile id, when the project does not use the default."
+    },
+    "basicPrograms": {
+      "type": "array",
+      "description": "Several BASIC programs to build and place on one disk. Used for a distribution disk that carries a menu and the programs it launches. A program named LOAD is what Extended BASIC runs at power-up.",
+      "items": {
+        "type": "object",
+        "required": [
+          "source",
+          "tiName"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Project-relative path to the BASIC source."
+          },
+          "tiName": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "TI filename on the disk. Ten characters, no spaces."
+          },
+          "format": {
+            "enum": [
+              "standard",
+              "long"
+            ],
+            "description": "Per-program format. Long does not auto-run."
+          }
+        }
+      }
     }
   }
 }

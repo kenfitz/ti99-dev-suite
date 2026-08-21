@@ -15,7 +15,7 @@ import type { ToolchainState } from '../toolchain/discovery';
 import { parseXas99, parseXdm99 } from './diagnostics';
 import type { ParsedDiagnostic } from './diagnostics';
 import { DIALECTS } from '../lang/dialect';
-import { basicSourceOf, isBasicProject, resolveTarget } from '../config/project';
+import { BasicProgramEntry, basicSourceOf, isBasicProject, resolveTarget } from '../config/project';
 import { describeForBuildLog, describeProgram } from '../lang/basic/format';
 import type { Project } from '../config/loader';
 import type { Capability, UnresolvedPolicy } from '../config/project';
@@ -226,8 +226,25 @@ export class BuildCoordinator {
             if (outputPath) artifacts.push(this.describeArtifact(capability, outputPath));
         }
 
-        // Disk projects assemble first, then the image is populated.
-        if (effective.config.type === 'disk' && effective.config.disk) {
+        // Populate whatever disk was actually built, rather than trusting a
+        // declared project type to agree with the outputs. A target that
+        // produces a disk-image without saying type: 'disk' used to get an
+        // empty disk and no complaint, which is a bad way to find out.
+        const builtDisk = artifacts.find(a => a.kind === 'disk-image');
+        const hasContents = Boolean(effective.config.disk) ||
+            (effective.config.basicPrograms ?? []).length > 0;
+        if (builtDisk && hasContents) {
+            const extra = await this.buildBasicPrograms(effective, toolchain, token);
+            if (!extra.ok) {
+                return { success: false, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
+            }
+            if (extra.programs.length) {
+                const placed = await this.addProgramsToDisk(effective, toolchain, builtDisk, extra.programs, token);
+                if (!placed) {
+                    return { success: false, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
+                }
+            }
+
             const added = await this.populateDisk(effective, toolchain, artifacts, token);
             if (!added) {
                 return { success: false, cancelled: false, artifacts, diagnostics: allDiagnostics, durationMs: Date.now() - started, steps };
@@ -441,7 +458,10 @@ export class BuildCoordinator {
             output: outputPath,
             listing: path.join(build, `${stem}.lst`),
             symbolFile: path.join(build, `${stem}.equ`),
-            dialectFlag: DIALECTS[config.syntaxDialect].assemblerFlag,
+            // A BASIC project has no reason to set an assembly dialect, and a
+            // hand-written config may omit it. Falling back beats crashing a
+            // build that never uses the flag.
+            dialectFlag: (DIALECTS[config.syntaxDialect] ?? DIALECTS.xdt99).assemblerFlag,
             registerFlag: pick('registerFlag', String(config.registerSymbols)),
             cpuFlag: pick('cpuFlag', config.processor),
             basicFormatFlag: pick('basicFormatFlag', config.basicFormat ?? 'standard'),
@@ -570,6 +590,127 @@ export class BuildCoordinator {
                 'basic-program', 'xb-program',
             ].includes(kind),
         };
+    }
+
+
+    /**
+     * Tokenise every program destined for a distribution disk.
+     *
+     * A target normally builds one program because one source is the product.
+     * A distribution disk is the exception: it carries several programs a
+     * person chooses between, which is how a multi-part adventure was actually
+     * shipped. Each is tokenised in its own right, so each gets its own
+     * diagnostics and its own format check rather than being lumped together.
+     *
+     * Runs before the disk image is populated, and reports which format each
+     * program came out as, because a program that lands in long format will
+     * not auto-run and that is worth seeing at build time.
+     */
+    private async buildBasicPrograms(
+        project: Project,
+        toolchain: ToolchainState,
+        token?: Cancellation,
+    ): Promise<{ ok: boolean; programs: Array<{ entry: BasicProgramEntry; path: string }> }> {
+        const entries = project.config.basicPrograms ?? [];
+        const programs: Array<{ entry: BasicProgramEntry; path: string }> = [];
+        if (entries.length === 0) { return { ok: true, programs }; }
+
+        const root = project.root.fsPath;
+        const build = path.resolve(root, project.config.buildDir);
+        fs.mkdirSync(build, { recursive: true });
+
+        const seen = new Set<string>();
+        for (const entry of entries) {
+            const tiName = entry.tiName.toUpperCase();
+            if (seen.has(tiName)) {
+                this.output.appendLine(
+                    `Disk: two programs are both named ${tiName}. A disk cannot hold both.`);
+                return { ok: false, programs };
+            }
+            seen.add(tiName);
+        }
+
+        for (const entry of entries) {
+            if (token?.cancelled) { return { ok: false, programs }; }
+
+            const source = path.resolve(root, entry.source);
+            if (!fs.existsSync(source)) {
+                this.output.appendLine(`Disk: ${entry.source} does not exist.`);
+                return { ok: false, programs };
+            }
+
+            const output = path.join(build, entry.tiName.toUpperCase());
+            this.output.appendLine('');
+            this.output.appendLine(`> ${entry.tiName}  (${entry.source})`);
+
+            // xbas99 treats an existing directory as a target directory, so a
+            // stale folder of the same name makes it write the program inside
+            // and still report success. Windows compares names without case,
+            // so build/stonehenge is enough to swallow build/STONEHENGE.
+            if (fs.existsSync(output) && fs.statSync(output).isDirectory()) {
+                this.output.appendLine(
+                    `  ${output} is a directory. Remove it: the tool would write ` +
+                    `the program inside it and report success.`);
+                return { ok: false, programs };
+            }
+
+            const args = [
+                path.join(toolchain.tool!.directory, 'xbas99.py'),
+                '-c',
+            ];
+            // Long format is opt-in per program, exactly as it is per project.
+            if ((entry.format ?? project.config.basicFormat ?? 'standard') === 'long') {
+                args.push('-L');
+            }
+            args.push(source, '-o', output);
+
+            const result = await run(
+                { program: toolchain.python!.path, args, cwd: root, onOutput: c => this.output.append(c) },
+                token);
+
+            const check = verifyArtifact(output);
+            if (result.exitCode !== 0 || !check.ok) {
+                this.output.appendLine(
+                    `  ${entry.tiName} failed (exit ${result.exitCode})${check.reason ? ': ' + check.reason : ''}`);
+                return { ok: false, programs };
+            }
+
+            try {
+                const info = describeProgram(new Uint8Array(fs.readFileSync(output)));
+                if (info) { this.output.appendLine('  ' + describeForBuildLog(info)); }
+            } catch { /* the format note is a courtesy, not a build condition */ }
+
+            programs.push({ entry, path: output });
+        }
+        return { ok: true, programs };
+    }
+
+    /** Add the separately built programs to the disk image. */
+    private async addProgramsToDisk(
+        project: Project,
+        toolchain: ToolchainState,
+        disk: Artifact,
+        programs: Array<{ entry: BasicProgramEntry; path: string }>,
+        token?: Cancellation,
+    ): Promise<boolean> {
+        for (const { entry, path: programPath } of programs) {
+            const args = [
+                path.join(toolchain.tool!.directory, 'xdm99.py'),
+                disk.path,
+                '-a', programPath,
+                '-f', 'PROGRAM',
+                '-n', entry.tiName.toUpperCase(),
+            ];
+            const result = await run(
+                { program: toolchain.python!.path, args, cwd: project.root.fsPath, onOutput: c => this.output.append(c) },
+                token);
+            if (result.exitCode !== 0) {
+                this.output.appendLine(`Disk: failed to add ${entry.tiName} (exit ${result.exitCode}).`);
+                return false;
+            }
+            this.output.appendLine(`Disk: added ${entry.tiName} as PROGRAM`);
+        }
+        return true;
     }
 
     /** Add build outputs to the disk image after it has been created. */

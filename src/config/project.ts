@@ -37,6 +37,27 @@ export interface DiskFileEntry {
     format: string;
 }
 
+/**
+ * One BASIC program to place on a disk alongside others.
+ *
+ * A target normally builds one program, because one source is the product. A
+ * distribution disk is the exception: it carries several programs a person
+ * chooses between, which is how a multi-part adventure or a utility disk was
+ * actually shipped. Each entry is tokenised in its own right and added to the
+ * disk under its TI name.
+ */
+export interface BasicProgramEntry {
+    /** Project-relative path to the BASIC source. */
+    source: string;
+    /** TI filename on the disk. Ten characters, no spaces. */
+    tiName: string;
+    /**
+     * Format for this program. Standard is preferred and is what Extended
+     * BASIC auto-runs when the name is LOAD.
+     */
+    format?: 'standard' | 'long';
+}
+
 export interface DiskOptions {
     geometry: string;
     volumeName: string;
@@ -103,6 +124,14 @@ export interface ProjectConfig {
      * it is used only when asked for.
      */
     basicFormat?: 'standard' | 'long';
+    /**
+     * Several BASIC programs to build and place on one disk.
+     *
+     * Present only on a distribution-disk target. When set, each entry is
+     * tokenised and added to the disk image, which is what lets one disk carry
+     * a menu and the programs it launches.
+     */
+    basicPrograms?: BasicProgramEntry[];
 }
 /**
  * One distribution route.
@@ -134,6 +163,7 @@ export interface TargetConfig {
     disk?: DiskOptions;
     basicSource?: string;
     basicName?: string;
+    basicPrograms?: BasicProgramEntry[];
     tiName?: string;
     assembler?: Partial<AssemblerOptions>;
 }
@@ -202,6 +232,7 @@ export function resolveTarget(cfg: ProjectConfig, id?: string): ProjectConfig {
         disk: target.disk ?? cfg.disk,
         basicSource: target.basicSource ?? cfg.basicSource,
         basicName: target.basicName ?? cfg.basicName,
+        basicPrograms: target.basicPrograms ?? cfg.basicPrograms,
         tiName: target.tiName ?? cfg.tiName,
         assembler: { ...cfg.assembler, ...target.assembler },
         // A resolved target is a plain config. Dropping the list prevents a

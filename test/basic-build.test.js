@@ -255,3 +255,129 @@ test("the schema offers the language and format choices that exist", () => {
     assert.deepStrictEqual(schema.properties.basicFormat.enum, ["standard", "long"]);
     assert.strictEqual(schema.properties.basicFormat.default, "standard");
 });
+
+// --- distribution disks holding several programs ---------------------------
+//
+// A target normally builds one program, because one source is the product. A
+// distribution disk is the exception: it carries several programs a person
+// chooses between, which is how a multi-part adventure was actually shipped.
+
+const { resolveTarget } = require("../out/config/project.js");
+
+test("a target carries its own list of programs", () => {
+    const config = {
+        name: "Collection", language: "ti-extended-basic",
+        sources: [], entrySource: "a.xb99",
+        targets: [{
+            id: "disk",
+            outputs: ["disk-image"],
+            basicPrograms: [
+                { source: "src/MENU.xb99", tiName: "LOAD" },
+                { source: "src/GAME.xb99", tiName: "GAME" },
+            ],
+        }],
+    };
+    const resolved = resolveTarget(config, "disk");
+    assert.strictEqual(resolved.basicPrograms.length, 2);
+    assert.strictEqual(resolved.basicPrograms[0].tiName, "LOAD");
+});
+
+test("a project-level list is inherited by a target that does not override it", () => {
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        basicPrograms: [{ source: "src/A.xb99", tiName: "A" }],
+        targets: [{ id: "disk", outputs: ["disk-image"] }],
+    };
+    assert.strictEqual(resolveTarget(config, "disk").basicPrograms.length, 1);
+});
+
+test("a target list overrides the project list rather than merging", () => {
+    // Merging would silently put programs on a disk the target never named.
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        basicPrograms: [{ source: "src/A.xb99", tiName: "A" }],
+        targets: [{
+            id: "disk", outputs: ["disk-image"],
+            basicPrograms: [{ source: "src/B.xb99", tiName: "B" }],
+        }],
+    };
+    const resolved = resolveTarget(config, "disk");
+    assert.deepStrictEqual(resolved.basicPrograms.map(p => p.tiName), ["B"]);
+});
+
+test("the schema describes the multi-program fields", () => {
+    const schema = JSON.parse(fs.readFileSync(
+        path.join(root, "schemas", "ti99.schema.json"), "utf8"));
+    assert.ok(schema.properties.basicPrograms, "projects may carry a program list");
+    assert.ok(schema.properties.targets.items.properties.basicPrograms,
+        "and so may a target");
+});
+
+test("a disk built from a real multi-program project holds every program", (t) => {
+    // The end-to-end check: tokenise several sources, create an image, add
+    // them all, and read the catalog back. Skipped where xdt99 is absent.
+    if (!haveXdt) { t.skip("xdt99 not available on this machine"); return; }
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ti99-multi-"));
+    const names = ["LOAD", "ALPHA", "BETA"];
+    const programs = names.map((name, i) => {
+        const source = path.join(dir, name + ".xb99");
+        fs.writeFileSync(source,
+            "100 CALL CLEAR\n110 PRINT \"" + name + "\"\n120 END\n", "utf8");
+        const out = path.join(dir, name);
+        execFileSync("python", [path.join(XDT, "xbas99.py"), "-c", source, "-o", out],
+            { stdio: "pipe" });
+        return { name, out, i };
+    });
+
+    const image = path.join(dir, "collection.dsk");
+    execFileSync("python", [path.join(XDT, "xdm99.py"), "-X", "sssd", image, "-n", "COLLECT"],
+        { stdio: "pipe" });
+    for (const p of programs) {
+        execFileSync("python",
+            [path.join(XDT, "xdm99.py"), image, "-a", p.out, "-f", "PROGRAM", "-n", p.name],
+            { stdio: "pipe" });
+    }
+
+    const catalog = execFileSync("python", [path.join(XDT, "xdm99.py"), image],
+        { stdio: "pipe" }).toString();
+    for (const name of names) {
+        assert.ok(new RegExp("^" + name + "\\s", "m").test(catalog),
+            name + " is missing from the disk");
+    }
+    assert.strictEqual((catalog.match(/PROGRAM/g) || []).length, names.length,
+        "every entry must be a PROGRAM");
+
+    // LOAD is what makes Extended BASIC start the disk by itself, so it has to
+    // be standard format. Long format is ignored at power-up.
+    const loadInfo = describeProgram(new Uint8Array(fs.readFileSync(
+        path.join(dir, "LOAD"))));
+    assert.strictEqual(loadInfo.format, "standard");
+
+    fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the Time Lost project is configured as a real distribution disk", (t) => {
+    // A worked example rather than a synthetic one: seven programs, a menu
+    // named LOAD, all Extended BASIC.
+    const file = "C:/Users/kenfi/source/Time-Lost-A-Computer-Adventure-TI-99-4a-/ti99.json";
+    if (!fs.existsSync(file)) { t.skip("the Time Lost project is not on this machine"); return; }
+
+    const config = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.strictEqual(config.language, "ti-extended-basic",
+        "five of the six adventures use :: and cannot run in TI BASIC");
+
+    const disk = config.targets.find(x => x.id === "distribution-disk");
+    assert.ok(disk, "there must be a distribution disk target");
+    assert.strictEqual(disk.basicPrograms.length, 7);
+    assert.strictEqual(disk.basicPrograms[0].tiName, "LOAD",
+        "the menu must be named LOAD so Extended BASIC runs it at power-up");
+
+    const names = disk.basicPrograms.map(p => p.tiName);
+    assert.strictEqual(new Set(names).size, names.length,
+        "two programs cannot share a TI filename on one disk");
+    for (const name of names) {
+        assert.ok(name.length <= 10, name + " exceeds the ten-character TI limit");
+        assert.ok(!/\s/.test(name), name + " contains a space, which TI filenames cannot");
+    }
+});

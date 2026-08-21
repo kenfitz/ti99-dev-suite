@@ -21,7 +21,7 @@ import { ActionPlan, artifactCurrent, askDialect, contextFor, initRouting,
     offerCanonicalRename, offerRebuild, pickTargetFor, planFor,
     updateContextKeys } from './actions/routing';
 import { LanguageId, labelOf } from './actions/languages';
-import { ActionKind, allTargets, findTargetDefinition } from './actions/targets';
+import { ActionKind, TargetDefinition, allTargets, findTargetDefinition } from './actions/targets';
 import { defaultTargetFor, projectTargetsFor, renameSourceReferences } from './actions/resolver';
 import { validate as validateBasic } from './lang/basic/validator';
 import { registerBasicProviders } from './lang/basic/providers';
@@ -747,14 +747,20 @@ async function doRouted(
     const project = projects?.active;
     const ctx = contextFor(found.uri, project?.config);
 
-    let targetId = chooseTarget ? undefined : defaultTargetFor(language, ctx, found.uri.fsPath);
-    if (!targetId) {
-        const picked = await pickTargetFor(language, action, ctx, found.uri.fsPath);
-        if (!picked) { return; }
-        targetId = picked.id;
+    let definition = chooseTarget
+        ? undefined
+        : findTargetDefinition(defaultTargetFor(language, ctx, found.uri.fsPath) ?? '');
+    if (!definition) {
+        definition = await pickTargetFor(language, action, ctx, found.uri.fsPath);
+        if (!definition) { return; }
     }
 
-    await runTargetAction(action, targetId, language);
+    // The picker offers the shipped definitions, so this has to be mapped onto
+    // the project's own target before the coordinator sees it.
+    const chosen = await projectTargetFor(definition, project);
+    if (!chosen) { return; }
+
+    await runTargetAction(action, chosen, language, definition);
 }
 
 /**
@@ -786,15 +792,52 @@ function buildIsCurrent(build: BuildResult | undefined): boolean {
         .every(a => artifactCurrent(a.path, sources));
 }
 
-async function runTargetAction(
-    action: ActionKind, targetId: string, language: LanguageId,
-): Promise<void> {
-    const definition = findTargetDefinition(targetId);
-    if (!definition) {
-        vscode.window.showErrorMessage("Unknown target '" + targetId + "'.");
-        return;
+/**
+ * The target in this project that serves a menu entry.
+ *
+ * The context menu is built from the definitions the extension ships, because
+ * VS Code menus are static and cannot be generated per project. Every path
+ * that starts from one of those definitions has to come through here before it
+ * reaches the build, or the coordinator is handed an id its project has never
+ * heard of.
+ *
+ * Returns undefined when the user cancels or the project cannot serve the
+ * entry at all.
+ */
+async function projectTargetFor(
+    definition: TargetDefinition, project: Project | undefined,
+): Promise<string | undefined> {
+    const targets = project?.config.targets ?? [];
+    // A project with no named targets builds whatever it declares, so the
+    // definition id is passed through untouched.
+    if (!project || targets.length === 0) { return definition.id; }
+
+    const candidates = projectTargetsFor(project.config, definition);
+    if (candidates.length === 1) { return candidates[0]; }
+    if (candidates.length === 0) {
+        void vscode.window.showInformationMessage(
+            'This project has no target that builds ' + definition.label +
+            '. It defines: ' + targets.map(t => t.id).join(', ') + '.');
+        return undefined;
     }
 
+    const picked = await vscode.window.showQuickPick(
+        candidates.map(id => {
+            const target = targets.find(t => t.id === id);
+            return { label: target?.label ?? id, description: id, detail: target?.description, id };
+        }),
+        { title: definition.menuLabel ?? definition.label, matchOnDetail: true });
+    return picked?.id;
+}
+
+async function runTargetAction(
+    action: ActionKind, targetId: string, language: LanguageId,
+    definition: TargetDefinition,
+): Promise<void> {
+    // targetId is a target of the user's project by this point. It must not be
+    // looked up in the built-in table: that table describes the menu, not any
+    // particular project, and searching it for a project id is what produced
+    // "Unknown target 'attack-of-the-slime-creatures'".
     if (language === "gpl") {
         vscode.window.showInformationMessage(
             "GPL is recognised but xga99 is not integrated yet.");
@@ -991,33 +1034,10 @@ async function doBuildAndRunTarget(targetId: string, uri?: vscode.Uri): Promise<
         return;
     }
 
-    // The menu is built from the definitions the extension ships, because VS
-    // Code menus are static. A project names its own targets, so the entry has
-    // to find the target that does this rather than assume the id matches.
-    const project = projects?.active;
-    let chosen = targetId;
-    if (project) {
-        const candidates = projectTargetsFor(project.config, definition);
-        if (candidates.length === 1) {
-            chosen = candidates[0];
-        } else if (candidates.length > 1) {
-            const picked = await vscode.window.showQuickPick(
-                candidates.map(id => {
-                    const t = (project.config.targets ?? []).find(x => x.id === id);
-                    return { label: t?.label ?? id, description: id, detail: t?.description, id };
-                }),
-                { title: definition.menuLabel ?? definition.label, matchOnDetail: true });
-            if (!picked) { return; }
-            chosen = picked.id;
-        } else if ((project.config.targets ?? []).length > 0) {
-            void vscode.window.showInformationMessage(
-                'This project has no target that builds ' + definition.label +
-                '. It defines: ' + (project.config.targets ?? []).map(t => t.id).join(', ') + '.');
-            return;
-        }
-    }
+    const chosen = await projectTargetFor(definition, projects?.active);
+    if (!chosen) { return; }
 
-    await runTargetAction("build-run", chosen, language);
+    await runTargetAction("build-run", chosen, language, definition);
 }
 
 async function doCreateProjectFromFile(context: vscode.ExtensionContext, uri?: vscode.Uri): Promise<void> {

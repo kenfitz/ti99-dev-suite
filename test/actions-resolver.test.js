@@ -395,3 +395,79 @@ test("every shipped template answers every menu entry it should", (t) => {
         }
     }
 });
+
+// --- no menu entry may hand the coordinator an id its project lacks --------
+//
+// Three separate paths reach the build: the per-target menu entries, the
+// generic commands with their picker, and Package. Fixing one and leaving the
+// others is how "Unknown target" survived three attempts, so this checks all
+// of them against real project shapes.
+
+const { resolveTarget: resolveForBuild } = require("../out/config/project.js");
+
+const PROJECTS = {
+    "named targets (Time Lost shape)": {
+        name: "T", language: "ti-extended-basic",
+        sources: [], entrySource: "a.xb99", outputs: ["basic-program"],
+        targets: [
+            { id: "one", outputs: ["basic-program"] },
+            { id: "two", outputs: ["basic-program"] },
+            { id: "the-disk", outputs: ["disk-image"] },
+        ],
+    },
+    "template shape": {
+        name: "T", language: "ti-extended-basic",
+        sources: [], entrySource: "a.xb99", outputs: ["basic-program"],
+        targets: [
+            { id: "program", outputs: ["basic-program"] },
+            { id: "disk", outputs: ["basic-program", "disk-image"] },
+        ],
+    },
+    "no targets at all": {
+        name: "T", language: "ti-extended-basic",
+        sources: [], entrySource: "a.xb99", outputs: ["basic-program"],
+    },
+};
+
+/** What the extension does before the coordinator sees an id. */
+function chosenFor(config, definition) {
+    const targets = config.targets ?? [];
+    if (targets.length === 0) { return definition.id; }
+    const candidates = projectTargetsFor(config, definition);
+    return candidates.length ? candidates[0] : undefined;
+}
+
+test("every menu entry resolves to something the project can build", () => {
+    for (const [shape, config] of Object.entries(PROJECTS)) {
+        for (const definition of require("../out/actions/targets.js").allTargets()) {
+            if (!definition.languageIds.includes("ti-extended-basic")) { continue; }
+            const chosen = chosenFor(config, definition);
+            if (chosen === undefined) { continue; }  // reported to the user, not an error
+            assert.doesNotThrow(() => resolveForBuild(config, chosen),
+                shape + ": " + definition.menuLabel + " produced '" + chosen +
+                "', which the project cannot resolve");
+        }
+    }
+});
+
+test("a project with no targets passes the definition id straight through", () => {
+    // resolveTarget returns the config unchanged when there are no targets, so
+    // the id is never looked up and cannot be unknown.
+    const config = PROJECTS["no targets at all"];
+    const definition = findTargetDefinition("xb-basic-program");
+    assert.strictEqual(chosenFor(config, definition), "xb-basic-program");
+    assert.doesNotThrow(() => resolveForBuild(config, "xb-basic-program"));
+});
+
+test("a project id is never looked up in the built-in table", () => {
+    // This is the mistake that produced "Unknown target
+    // 'attack-of-the-slime-creatures'": the built-in table describes the menu,
+    // not any particular project.
+    assert.strictEqual(findTargetDefinition("attack-of-the-slime-creatures"), undefined);
+    assert.strictEqual(findTargetDefinition("distribution-disk"), undefined);
+    const source = fs.readFileSync(path.join(root, "src", "extension.ts"), "utf8");
+    const body = source.slice(source.indexOf("async function runTargetAction"));
+    const end = body.indexOf("\n}\n");
+    assert.ok(!/findTargetDefinition\(/.test(body.slice(0, end)),
+        "runTargetAction receives the definition; it must not look one up by project id");
+});

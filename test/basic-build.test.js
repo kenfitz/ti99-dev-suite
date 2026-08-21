@@ -381,3 +381,71 @@ test("the Time Lost project is configured as a real distribution disk", (t) => {
         assert.ok(!/\s/.test(name), name + " contains a space, which TI filenames cannot");
     }
 });
+
+// --- what a FIAD directory needs -------------------------------------------
+//
+// Classic99 reads a headerless file with no extension as DIS/FIX 128. A raw
+// tokenised program dropped into DSK1 is therefore on the disk but is not a
+// PROGRAM, so Extended BASIC finds nothing to run and boots to READY. Only the
+// TIFILES-wrapped form carries the type byte that says PROGRAM.
+
+test("a FIAD profile stages the TIFILES form, never the raw image", () => {
+    for (const id of ["classic99-basic", "classic99-xb-program", "classic99-xb"]) {
+        const profile = BUILTIN_EMULATORS.find(p => p.id === id);
+        const copies = profile.preLaunch.filter(s => s.action === "copy");
+        for (const copy of copies) {
+            assert.ok(!/\$\{artifact:basic-program\}/.test(copy.from),
+                id + " stages the raw image, which Classic99 reads as DIS/FIX 128");
+        }
+    }
+});
+
+test("a target that runs through FIAD builds the TIFILES form", () => {
+    // Staging it is no use if the build never produced it.
+    for (const target of allTargets()) {
+        const profile = BUILTIN_EMULATORS.find(p => p.id === target.emulatorProfile);
+        if (!profile || profile.kind !== "fiad-drop") { continue; }
+        const needsTifiles = profile.preLaunch.some(
+            s => s.action === "copy" && /basic-tifiles/.test(s.from || ""));
+        if (!needsTifiles) { continue; }
+        if (!target.outputs.includes("basic-program")) { continue; }
+        assert.ok(target.outputs.includes("basic-tifiles"),
+            target.id + " runs through a profile that stages basic-tifiles but never builds it");
+    }
+});
+
+test("the raw and wrapped forms do not collide on disk", () => {
+    // Both want the same TI name. Writing them to the same path means the
+    // second silently replaces the first, and which one survives depends on
+    // build order.
+    const { BUILTIN_PROFILES } = require("../out/toolchain/profiles.js");
+    const commands = BUILTIN_PROFILES[0].commands;
+    assert.ok(commands["basic-program"], "the raw form is built");
+    assert.ok(commands["basic-tifiles"], "and the wrapped form too");
+    assert.match(JSON.stringify(commands["basic-tifiles"].args), /-f.*PROGRAM/,
+        "the wrapper must mark the file as PROGRAM, which is the whole point");
+});
+
+test("a real wrapped program declares itself PROGRAM", (t) => {
+    if (!haveXdt) { t.skip("xdt99 not available on this machine"); return; }
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ti99-fiad-"));
+    const source = path.join(dir, "p.xb99");
+    fs.writeFileSync(source, '100 PRINT "HI"\n110 END\n', "utf8");
+
+    const raw = path.join(dir, "RAW");
+    execFileSync("python", [path.join(XDT, "xbas99.py"), "-c", source, "-o", raw], { stdio: "pipe" });
+    const wrapped = path.join(dir, "WRAPPED");
+    execFileSync("python",
+        [path.join(XDT, "xdm99.py"), "-T", raw, "-f", "PROGRAM", "-o", wrapped], { stdio: "pipe" });
+
+    const rawBytes = fs.readFileSync(raw);
+    assert.notStrictEqual(rawBytes[0], 0x07,
+        "the raw image has no TIFILES header, which is why it cannot be served from FIAD");
+
+    const bytes = fs.readFileSync(wrapped);
+    assert.strictEqual(bytes[0], 0x07);
+    assert.strictEqual(bytes.subarray(1, 8).toString("latin1"), "TIFILES");
+    assert.strictEqual(bytes[10], 0x01, "byte 10 must say PROGRAM");
+
+    fs.rmSync(dir, { recursive: true, force: true });
+});

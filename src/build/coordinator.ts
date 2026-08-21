@@ -387,14 +387,22 @@ export class BuildCoordinator {
             // Extended BASIC runs a program called LOAD from DSK1 at power-up,
             // so that is the default name a boot disk wants.
             case 'basic-program':
-                // For a BASIC project the tokenised program is the product, so
-                // it goes to dist under its TI name. For an assembly project it
-                // is the loader component of an Extended BASIC disk, which the
-                // disk step picks up out of the build directory.
-                return isBasicProject(config)
-                    ? path.join(dist, config.tiName ?? config.basicName ?? tiStem)
-                    : path.join(build, config.basicName ?? 'LOAD');
-            case 'basic-tifiles': return path.join(dist, config.basicName ?? 'LOAD');
+                // The raw tokenised image. It is an intermediate: xdm99 puts it
+                // on a disk, and the TIFILES wrapper below turns it into
+                // something a FIAD directory can serve. Keeping it in the build
+                // directory also stops it colliding with basic-tifiles, which
+                // wants the same TI name in dist.
+                return path.join(build, isBasicProject(config)
+                    ? (config.tiName ?? config.basicName ?? tiStem)
+                    : (config.basicName ?? 'LOAD'));
+            case 'basic-tifiles':
+                // TIFILES-wrapped, which is what a FIAD directory needs. Without
+                // the header Classic99 reads a headerless file as DIS/FIX 128
+                // rather than PROGRAM, so Extended BASIC never finds a program
+                // to run and boots straight to READY.
+                return path.join(dist, isBasicProject(config)
+                    ? (config.tiName ?? config.basicName ?? tiStem)
+                    : (config.basicName ?? 'LOAD'));
             // Extended BASIC runs a program called LOAD from DSK1 at power-up.
             case 'xb-program': return path.join(dist, config.basicName ?? 'LOAD');
             case 'xb-tifiles': return path.join(dist, `${config.basicName ?? 'LOAD'}.tfi`);

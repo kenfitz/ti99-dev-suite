@@ -117,7 +117,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Tokenize to a native TI BASIC program and run it in TI BASIC.",
         languageIds: ["ti-basic"],
         actionKinds: ["build", "run", "build-run", "validate"],
-        outputs: ["basic-program"],
+        outputs: ["basic-program", "basic-tifiles"],
         emulatorProfile: "classic99-basic",
         requires: [CLASSIC99],
     },
@@ -128,7 +128,10 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Build a disk holding the tokenized TI BASIC program.",
         languageIds: ["ti-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],
-        outputs: ["basic-program", "disk-image"],
+        // The disk is the deliverable; the TIFILES copy is what the
+        // emulator profile actually stages, since no profile boots
+        // BASIC with a mounted image yet.
+        outputs: ["basic-program", "basic-tifiles", "disk-image"],
         emulatorProfile: "classic99-basic",
         requires: [CLASSIC99, DSK1],
     },
@@ -139,7 +142,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Run this TI BASIC program under Extended BASIC instead. An alternate runtime; the source stays TI BASIC.",
         languageIds: ["ti-basic"],
         actionKinds: ["run", "build-run"],
-        outputs: ["basic-program"],
+        outputs: ["basic-program", "basic-tifiles"],
         emulatorProfile: "classic99-xb-program",
         requires: [CLASSIC99, XB_ROM],
     },
@@ -150,7 +153,7 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Tokenize to a native Extended BASIC program and run it.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "run", "build-run", "validate"],
-        outputs: ["basic-program"],
+        outputs: ["basic-program", "basic-tifiles"],
         emulatorProfile: "classic99-xb-program",
         requires: [CLASSIC99, XB_ROM],
     },
@@ -161,7 +164,10 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Build a disk holding the tokenized Extended BASIC program.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],
-        outputs: ["basic-program", "disk-image"],
+        // The disk is the deliverable; the TIFILES copy is what the
+        // emulator profile actually stages, since no profile boots
+        // BASIC with a mounted image yet.
+        outputs: ["basic-program", "basic-tifiles", "disk-image"],
         emulatorProfile: "classic99-xbdisk",
         requires: [CLASSIC99, XB_ROM],
     },
@@ -172,7 +178,10 @@ export const BASIC_TARGETS: TargetDefinition[] = [
         description: "Build a disk whose program is named LOAD, so Extended BASIC starts it by itself at power-up.",
         languageIds: ["ti-extended-basic"],
         actionKinds: ["build", "package", "run", "build-run", "validate"],
-        outputs: ["basic-program", "disk-image"],
+        // The disk is the deliverable; the TIFILES copy is what the
+        // emulator profile actually stages, since no profile boots
+        // BASIC with a mounted image yet.
+        outputs: ["basic-program", "basic-tifiles", "disk-image"],
         emulatorProfile: "classic99-xbdisk",
         requires: [CLASSIC99, XB_ROM],
     },

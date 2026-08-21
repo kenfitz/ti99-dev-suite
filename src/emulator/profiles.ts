@@ -226,12 +226,15 @@ export const CLASSIC99_BASIC: EmulatorProfile = {
     id: 'classic99-basic',
     displayName: 'Classic99 — TI BASIC',
     kind: 'fiad-drop',
-    accepts: ['basic-program', 'disk-image'],
+    accepts: ['basic-tifiles', 'basic-program', 'disk-image'],
     executable: '${config:ti99.emulator.classic99Path}',
     args: [],
     preLaunch: [
         { action: 'mkdir', to: '${config:ti99.emulator.classic99Dsk1}' },
-        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+        // The TIFILES-wrapped form, not the raw image. Classic99 reads a
+        // headerless file with no extension as DIS/FIX 128, so a raw program
+        // is on the disk but is not a PROGRAM, and nothing can load it.
+        { action: 'copy', from: '${artifact:basic-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
     ],
     singleInstance: true,
     detached: true,
@@ -256,7 +259,7 @@ export const CLASSIC99_XB_PROGRAM: EmulatorProfile = {
     id: 'classic99-xb-program',
     displayName: 'Classic99 — Extended BASIC program',
     kind: 'fiad-drop',
-    accepts: ['basic-program', 'disk-image'],
+    accepts: ['basic-tifiles', 'basic-program', 'disk-image'],
     executable: '${config:ti99.emulator.classic99Path}',
     args: ['-rom', '${config:ti99.emulator.classic99XbRom}'],
     preLaunch: [
@@ -266,8 +269,8 @@ export const CLASSIC99_XB_PROGRAM: EmulatorProfile = {
         // itself. The copy under its own name is so the program can still be
         // reached deliberately, with OLD DSK1.NAME, when you want to LIST or
         // edit it instead of watching it run.
-        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/LOAD' },
-        { action: 'copy', from: '${artifact:basic-program}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
+        { action: 'copy', from: '${artifact:basic-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/LOAD' },
+        { action: 'copy', from: '${artifact:basic-tifiles}', to: '${config:ti99.emulator.classic99Dsk1}/${basicName}' },
     ],
     singleInstance: true,
     detached: true,

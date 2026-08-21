@@ -10,7 +10,7 @@
  * Nothing in this file imports vscode, so all of it can be tested directly.
  */
 
-import { ProjectConfig, TargetConfig } from "../config/project";
+import { Capability, ProjectConfig, TargetConfig } from "../config/project";
 import { LanguageId, LanguageResolution, findLanguage, resolveLanguage } from "./languages";
 import { scanSource } from "./evidence";
 import {
@@ -381,4 +381,42 @@ export function renameSourceReferences(
     }
 
     return { config: next, changed };
+}
+
+/**
+ * Which of a project's own targets can serve a menu entry.
+ *
+ * The context menu is built from the target definitions the extension ships,
+ * because VS Code menus are static and cannot be generated per project. A
+ * project names its own targets, so "Build and Run in Extended BASIC" has to
+ * find the target that does that rather than assume an id.
+ *
+ * Matching is on what a target produces. A definition that yields a disk
+ * matches targets that build a disk; one that yields a bare program matches
+ * targets that do not. Falling back to the definition id keeps projects
+ * working that happen to use the same names.
+ */
+export function projectTargetsFor(
+    config: ProjectConfig, definition: { id: string; outputs: Capability[] },
+): string[] {
+    const targets = config.targets ?? [];
+    if (targets.length === 0) { return []; }
+
+    const exact = targets.find(t => t.id === definition.id);
+    if (exact) { return [exact.id]; }
+
+    const wantsDisk = definition.outputs.includes('disk-image');
+    const produces = (t: TargetConfig): Capability[] => t.outputs ?? config.outputs ?? [];
+
+    const candidates = targets.filter(t => {
+        const outputs = produces(t);
+        const makesDisk = outputs.includes('disk-image');
+        if (wantsDisk !== makesDisk) { return false; }
+        // A bare-program definition also needs the target to make a program.
+        if (!wantsDisk) {
+            return definition.outputs.some(c => outputs.includes(c));
+        }
+        return true;
+    });
+    return candidates.map(t => t.id);
 }

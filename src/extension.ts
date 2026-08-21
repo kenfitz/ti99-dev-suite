@@ -22,7 +22,7 @@ import { ActionPlan, artifactCurrent, askDialect, contextFor, initRouting,
     updateContextKeys } from './actions/routing';
 import { LanguageId, labelOf } from './actions/languages';
 import { ActionKind, allTargets, findTargetDefinition } from './actions/targets';
-import { defaultTargetFor, renameSourceReferences } from './actions/resolver';
+import { defaultTargetFor, projectTargetsFor, renameSourceReferences } from './actions/resolver';
 import { validate as validateBasic } from './lang/basic/validator';
 import { registerBasicProviders } from './lang/basic/providers';
 import type { Dialect } from './lang/basic/metadata';
@@ -991,7 +991,33 @@ async function doBuildAndRunTarget(targetId: string, uri?: vscode.Uri): Promise<
         return;
     }
 
-    await runTargetAction("build-run", targetId, language);
+    // The menu is built from the definitions the extension ships, because VS
+    // Code menus are static. A project names its own targets, so the entry has
+    // to find the target that does this rather than assume the id matches.
+    const project = projects?.active;
+    let chosen = targetId;
+    if (project) {
+        const candidates = projectTargetsFor(project.config, definition);
+        if (candidates.length === 1) {
+            chosen = candidates[0];
+        } else if (candidates.length > 1) {
+            const picked = await vscode.window.showQuickPick(
+                candidates.map(id => {
+                    const t = (project.config.targets ?? []).find(x => x.id === id);
+                    return { label: t?.label ?? id, description: id, detail: t?.description, id };
+                }),
+                { title: definition.menuLabel ?? definition.label, matchOnDetail: true });
+            if (!picked) { return; }
+            chosen = picked.id;
+        } else if ((project.config.targets ?? []).length > 0) {
+            void vscode.window.showInformationMessage(
+                'This project has no target that builds ' + definition.label +
+                '. It defines: ' + (project.config.targets ?? []).map(t => t.id).join(', ') + '.');
+            return;
+        }
+    }
+
+    await runTargetAction("build-run", chosen, language);
 }
 
 async function doCreateProjectFromFile(context: vscode.ExtensionContext, uri?: vscode.Uri): Promise<void> {

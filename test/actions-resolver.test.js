@@ -5,6 +5,9 @@
 // it free of vscode imports.
 const test = require("node:test");
 const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
+const root = path.join(__dirname, "..");
 const {
     resolveSource, resolveFileLanguage, resolveTargets, resolveActions,
     defaultTargetFor, artifactIsCurrent, contextKeysFor, renameSourceReferences,
@@ -283,4 +286,112 @@ test("renaming does not mutate the config it was given", () => {
     const config = { name: "G", sources: ["src/game.b99"], entrySource: "src/game.b99" };
     renameSourceReferences(config, "src/game.b99", "src/game.xb99");
     assert.strictEqual(config.entrySource, "src/game.b99", "caller keeps the original");
+});
+
+// --- menu entries resolving to a project's own targets ---------------------
+//
+// The context menu is built from the definitions the extension ships, because
+// VS Code menus are static and cannot be generated per project. A project
+// names its own targets, so an entry has to find the target that does the job
+// rather than assume the id matches. Before this, three of the eight entries
+// on a real project failed with "Unknown target".
+
+const { projectTargetsFor } = require("../out/actions/resolver.js");
+const { findTargetDefinition } = require("../out/actions/targets.js");
+
+test("an entry finds the project target that produces the same thing", () => {
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        targets: [
+            { id: "my-program", outputs: ["basic-program"] },
+            { id: "my-disk", outputs: ["basic-program", "disk-image"] },
+        ],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-program")), ["my-program"]);
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-disk")), ["my-disk"]);
+});
+
+test("a disk entry never resolves to a bare-program target, or the reverse", () => {
+    // Running the disk entry and getting a loose program, or vice versa, is
+    // the confusion this matching exists to prevent.
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        targets: [{ id: "program-only", outputs: ["basic-program"] }],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-disk")), [],
+        "no disk target exists, so the disk entry must match nothing");
+
+    const diskOnly = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        targets: [{ id: "disk-only", outputs: ["disk-image"] }],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(diskOnly, findTargetDefinition("xb-basic-program")), [],
+        "no program target exists, so the program entry must match nothing");
+});
+
+test("several matching targets are all offered, for the user to choose", () => {
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        targets: [
+            { id: "one", outputs: ["basic-program"] },
+            { id: "two", outputs: ["basic-program"] },
+            { id: "three", outputs: ["basic-program"] },
+        ],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-program")),
+        ["one", "two", "three"]);
+});
+
+test("a target named exactly like the definition wins outright", () => {
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        targets: [
+            { id: "xb-basic-program", outputs: ["basic-program"] },
+            { id: "another", outputs: ["basic-program"] },
+        ],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-program")),
+        ["xb-basic-program"]);
+});
+
+test("a project with no targets falls through to the built-in id", () => {
+    const config = { name: "C", sources: [], entrySource: "a.xb99", outputs: ["basic-program"] };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-program")), [],
+        "nothing to match against; the caller uses the definition id as it stands");
+});
+
+test("targets inherit the project outputs when they declare none", () => {
+    const config = {
+        name: "C", sources: [], entrySource: "a.xb99",
+        outputs: ["basic-program"],
+        targets: [{ id: "inherits" }],
+    };
+    assert.deepStrictEqual(
+        projectTargetsFor(config, findTargetDefinition("xb-basic-program")), ["inherits"]);
+});
+
+test("every shipped template answers every menu entry it should", (t) => {
+    // The bug reached a user because no test asked whether a real project
+    // could actually serve the menu it was shown.
+    for (const [dir, entries] of [
+        ["ti-basic", ["basic-program", "basic-disk"]],
+        ["ti-extended-basic", ["xb-basic-program", "xb-basic-disk", "xb-autorun-disk"]],
+    ]) {
+        const file = path.join(root, "templates", dir, "ti99.json");
+        if (!fs.existsSync(file)) { t.skip("template missing"); return; }
+        const config = JSON.parse(
+            fs.readFileSync(file, "utf8").replace(/\{\{[A-Z]+\}\}/g, "X"));
+        for (const id of entries) {
+            const matched = projectTargetsFor(config, findTargetDefinition(id));
+            assert.ok(matched.length > 0,
+                dir + " offers " + id + " in its menu but has no target that serves it");
+        }
+    }
 });
